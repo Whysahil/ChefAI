@@ -2,7 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Recipe } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Note: Creating the instance here is okay as long as process.env.API_KEY is available at runtime.
+// In Vercel, ensure API_KEY is set in the Environment Variables.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 const recipeSchema = {
   type: Type.OBJECT,
@@ -142,12 +144,16 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
       }
     });
 
-    const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+    const candidate = response.candidates?.[0];
+    const parts = candidate?.content?.parts;
+    const part = parts?.find(p => p.inlineData);
+
     if (part?.inlineData) {
       return `data:image/png;base64,${part.inlineData.data}`;
     }
     return 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&q=80&w=1000';
   } catch (err) {
+    console.error("Image generation failed:", err);
     return 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&q=80&w=1000';
   }
 }
