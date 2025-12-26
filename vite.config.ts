@@ -10,14 +10,12 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    chunkSizeWarningLimit: 1000,
+    sourcemap: false,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-utils': ['lucide-react', '@google/genai'],
-        },
+        // Let Rollup decide the best way to split chunks automatically
+        // Manual chunks can sometimes force large libraries into a single block that exceeds limits
       },
     },
   }
