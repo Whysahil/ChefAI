@@ -16,8 +16,8 @@ const Settings: React.FC = () => {
       icon: <UserIcon size={20} />,
       content: (
         <div className="space-y-8">
-          <div className="flex items-center gap-6 p-6 bg-paper-50 dark:bg-charcoal-900 rounded-[2rem]">
-            <div className="w-16 h-16 bg-saffron-100 text-saffron-600 rounded-full flex items-center justify-center text-xl font-black">
+          <div className="flex items-center gap-6 p-6 bg-paper-50 dark:bg-charcoal-900/50 rounded-[2rem] border border-paper-100 dark:border-white/5">
+            <div className="w-16 h-16 bg-saffron-100 dark:bg-saffron-500/20 text-saffron-600 dark:text-saffron-400 rounded-full flex items-center justify-center text-xl font-black">
               {user?.displayName[0]}
             </div>
             <div className="text-left">
@@ -26,22 +26,22 @@ const Settings: React.FC = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Current Skill Level</label>
               <select 
                 value={user?.preferences.skillLevel}
                 onChange={e => updatePreferences({ skillLevel: e.target.value as any })}
-                className="w-full bg-transparent border-b-2 border-paper-100 dark:border-white/10 py-4 text-base font-serif italic font-black text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500"
+                className="w-full bg-paper-100/50 dark:bg-charcoal-900/50 border-b-2 border-paper-100 dark:border-white/10 px-4 py-4 text-base font-serif italic font-black text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500 rounded-t-xl transition-all"
               >
                 {SKILL_LEVELS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Dietary Constraint</label>
               <select 
                 value={user?.preferences.diet}
                 onChange={e => updatePreferences({ diet: e.target.value })}
-                className="w-full bg-transparent border-b-2 border-paper-100 dark:border-white/10 py-4 text-base font-serif italic font-black text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500"
+                className="w-full bg-paper-100/50 dark:bg-charcoal-900/50 border-b-2 border-paper-100 dark:border-white/10 px-4 py-4 text-base font-serif italic font-black text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500 rounded-t-xl transition-all"
               >
                 {DIETS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -56,7 +56,7 @@ const Settings: React.FC = () => {
       icon: <Palette size={20} />,
       content: (
         <div className="space-y-6 text-left">
-          <div className="flex items-center justify-between p-6 bg-paper-50 dark:bg-charcoal-900 rounded-3xl border border-paper-100 dark:border-white/5">
+          <div className="flex items-center justify-between p-6 bg-paper-50 dark:bg-charcoal-900/50 rounded-3xl border border-paper-100 dark:border-white/5 transition-all hover:border-saffron-500/30">
             <div>
               <p className="text-sm font-bold text-curry-900 dark:text-white">Dark Mode Synthesis</p>
               <p className="text-xs text-slate-400 mt-1">Optimize interface for low-light environments.</p>
@@ -68,7 +68,7 @@ const Settings: React.FC = () => {
               <div className="w-6 h-6 bg-white rounded-full shadow-md" />
             </button>
           </div>
-          <div className="flex items-center justify-between p-6 bg-paper-50 dark:bg-charcoal-900 rounded-3xl border border-paper-100 dark:border-white/5">
+          <div className="flex items-center justify-between p-6 bg-paper-50 dark:bg-charcoal-900/50 rounded-3xl border border-paper-100 dark:border-white/5">
             <div>
               <p className="text-sm font-bold text-curry-900 dark:text-white">Primary Interface Locale</p>
               <p className="text-xs text-slate-400 mt-1">Currently restricted to English (Global).</p>
@@ -86,7 +86,7 @@ const Settings: React.FC = () => {
       icon: <Shield size={20} />,
       content: (
         <div className="space-y-4">
-           <button className="w-full flex items-center justify-between p-6 hover:bg-paper-50 dark:hover:bg-charcoal-900 rounded-3xl transition-all border border-transparent hover:border-paper-100 text-left">
+           <button className="w-full flex items-center justify-between p-6 hover:bg-paper-50 dark:hover:bg-charcoal-900 rounded-3xl transition-all border border-transparent hover:border-paper-100 dark:hover:border-white/10 text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-paper-100 dark:bg-charcoal-800 rounded-2xl text-slate-400"><Bell size={18} /></div>
                 <div>
@@ -98,9 +98,9 @@ const Settings: React.FC = () => {
            </button>
            <button 
              onClick={() => logout()}
-             className="w-full flex items-center gap-4 p-6 hover:bg-paprika-50 rounded-3xl transition-all text-paprika-600 group"
+             className="w-full flex items-center gap-4 p-6 hover:bg-paprika-50 dark:hover:bg-paprika-950/20 rounded-3xl transition-all text-paprika-600 group"
            >
-              <div className="p-3 bg-paprika-100 rounded-2xl group-hover:bg-paprika-600 group-hover:text-white transition-all"><LogOut size={18} /></div>
+              <div className="p-3 bg-paprika-100 dark:bg-paprika-900/30 rounded-2xl group-hover:bg-paprika-600 group-hover:text-white transition-all"><LogOut size={18} /></div>
               <div className="text-left">
                  <p className="text-sm font-black uppercase tracking-widest">Terminate Session</p>
                  <p className="text-xs opacity-60 mt-1">Securely sign out of current node.</p>

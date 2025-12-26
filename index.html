@@ -59,6 +59,9 @@
       }
     </script>
     <style>
+      :root { color-scheme: light; }
+      .dark { color-scheme: dark; }
+      
       body {
         -webkit-font-smoothing: antialiased;
         transition: background-color 0.4s ease, color 0.4s ease;
@@ -98,6 +101,16 @@
       .recipe-scroll::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 10px; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+      /* Fix for native select options in dark mode */
+      select option {
+        background-color: #fdfbf7;
+        color: #1a1a1a;
+      }
+      .dark select option {
+        background-color: #1a1a1a;
+        color: #f1f5f9;
+      }
     </style>
   <script type="importmap">
 {

@@ -232,13 +232,21 @@ const Studio: React.FC = () => {
             <div className="grid grid-cols-2 gap-10 text-left">
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Region / Style</label>
-                <select value={prefs.cuisine} onChange={e => setPrefs(p => ({ ...p, cuisine: e.target.value }))} className="w-full bg-transparent border-b-2 border-white/50 py-3 text-base font-serif font-black italic text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500">
+                <select 
+                  value={prefs.cuisine} 
+                  onChange={e => setPrefs(p => ({ ...p, cuisine: e.target.value }))} 
+                  className="w-full bg-paper-50/50 dark:bg-charcoal-900/50 border-b-2 border-white/50 dark:border-white/10 px-4 py-3 text-base font-serif font-black italic text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500 rounded-t-xl"
+                >
                   {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Proficiency</label>
-                <select value={prefs.skill} onChange={e => setPrefs(p => ({ ...p, skill: e.target.value as any }))} className="w-full bg-transparent border-b-2 border-white/50 py-3 text-base font-serif font-black italic text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500">
+                <select 
+                  value={prefs.skill} 
+                  onChange={e => setPrefs(p => ({ ...p, skill: e.target.value as any }))} 
+                  className="w-full bg-paper-50/50 dark:bg-charcoal-900/50 border-b-2 border-white/50 dark:border-white/10 px-4 py-3 text-base font-serif font-black italic text-curry-900 dark:text-white focus:outline-none focus:border-saffron-500 rounded-t-xl"
+                >
                   {SKILL_LEVELS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
