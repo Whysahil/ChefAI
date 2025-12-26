@@ -11,11 +11,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    chunkSizeWarningLimit: 2000,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        // Let Rollup decide the best way to split chunks automatically
-        // Manual chunks can sometimes force large libraries into a single block that exceeds limits
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Split out specific heavy libraries
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('@google/genai')) return 'vendor-ai';
+            // All other dependencies go to a general vendor chunk
+            return 'vendor';
+          }
+        },
       },
     },
   }
