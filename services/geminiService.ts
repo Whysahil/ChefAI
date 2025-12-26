@@ -57,8 +57,10 @@ const recipeSchema = {
   ]
 };
 
+const getAIInstance = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
 export async function analyzeIngredients(base64Image: string): Promise<string[]> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const ai = getAIInstance();
   const prompt = "Identify all the food ingredients visible in this image. Return a simple comma-separated list of the names only.";
   
   try {
@@ -71,7 +73,10 @@ export async function analyzeIngredients(base64Image: string): Promise<string[]>
             { inlineData: { mimeType: "image/jpeg", data: base64Image } }
           ]
         }
-      ]
+      ],
+      config: {
+        thinkingConfig: { thinkingBudget: 0 }
+      }
     });
     
     const text = response.text;
@@ -92,7 +97,7 @@ export async function generateRecipe(params: {
   spiceLevel?: string,
   cookingPreference?: string
 }): Promise<Recipe> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const ai = getAIInstance();
   
   const prompt = `You are ChefAI, an elite culinary intelligence specializing in authentic and fusion cuisine.
     TASK: Generate a precise, professional recipe based on the user's input.
@@ -119,13 +124,16 @@ export async function generateRecipe(params: {
       config: {
         responseMimeType: "application/json",
         responseSchema: recipeSchema,
+        thinkingConfig: { thinkingBudget: 4000 }
       },
     });
 
     const text = response.text;
     if (!text) throw new Error("Empty response from AI");
 
-    const recipeData = JSON.parse(text.trim());
+    // Robust parsing for common markdown-wrapped JSON
+    const cleanJson = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+    const recipeData = JSON.parse(cleanJson);
     
     return {
       ...recipeData,
@@ -139,42 +147,8 @@ export async function generateRecipe(params: {
   }
 }
 
-export async function parseFiltersWithAI(text: string): Promise<any> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  const prompt = `Parse the following natural language cooking request into parameters:
-  " ${text} "
-  Return JSON with keys: cuisine, diet, mealType, skill, spiceLevel, cookingPreference.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            cuisine: { type: Type.STRING },
-            diet: { type: Type.STRING },
-            mealType: { type: Type.STRING },
-            skill: { type: Type.STRING },
-            spiceLevel: { type: Type.STRING },
-            cookingPreference: { type: Type.STRING }
-          }
-        }
-      }
-    });
-
-    const parsedText = response.text;
-    return parsedText ? JSON.parse(parsedText.trim()) : null;
-  } catch (err) {
-    console.error("Filter parsing failure:", err);
-    return null;
-  }
-}
-
 export async function generateRecipeImage(prompt: string): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const ai = getAIInstance();
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -200,13 +174,16 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
 }
 
 export function createChefChat(recipe: Recipe) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const ai = getAIInstance();
   const systemInstruction = `You are ChefAI assistant. You are helping the user with the recipe: "${recipe.title}".
     Details: ${recipe.description}. Ingredients: ${recipe.ingredients.map(i => i.name).join(', ')}.
     Answer questions about substitutions, scaling, or technique. Be professional and concise.`;
     
   return ai.chats.create({
     model: 'gemini-3-pro-preview',
-    config: { systemInstruction }
+    config: { 
+      systemInstruction,
+      thinkingConfig: { thinkingBudget: 2000 }
+    }
   });
 }
