@@ -1,69 +1,124 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserPreferences } from '../types';
+import { User, UserPreferences, Recipe } from '../types';
 
 interface AuthContextType {
   user: User | null;
+  accounts: User[];
   loading: boolean;
   login: (email: string) => Promise<void>;
+  signup: (name: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
+  switchAccount: (uid: string) => void;
   updatePreferences: (prefs: Partial<UserPreferences>) => void;
+  saveRecipe: (recipe: Recipe) => void;
+  deleteRecipe: (id: string) => void;
+  savedRecipes: Recipe[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MOCK_USER: User = {
-  uid: '12345',
-  email: 'chef@example.com',
-  displayName: 'Gourmet Chef',
-  theme: 'light',
-  savedRecipes: [],
-  preferences: {
-    diet: 'None',
-    skillLevel: 'Intermediate',
-    defaultServings: 2,
-    favoriteCuisines: ['Italian', 'Mexican'],
-    allergies: []
-  }
-};
+const STORAGE_KEY = 'chef_ai_accounts';
+const SESSION_KEY = 'chef_ai_current_uid';
+const RECIPE_KEY = 'chef_ai_saved_recipes';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [accounts, setAccounts] = useState<User[]>([]);
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking session
-    const savedUser = localStorage.getItem('user_session');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    const storedAccounts = localStorage.getItem(STORAGE_KEY);
+    const currentUid = localStorage.getItem(SESSION_KEY);
+    const storedRecipes = localStorage.getItem(RECIPE_KEY);
+
+    if (storedAccounts) {
+      const parsedAccounts = JSON.parse(storedAccounts);
+      setAccounts(parsedAccounts);
+      if (currentUid) {
+        const currentUser = parsedAccounts.find((u: User) => u.uid === currentUid);
+        if (currentUser) setUser(currentUser);
+      }
+    }
+    if (storedRecipes) {
+      setSavedRecipes(JSON.parse(storedRecipes));
     }
     setLoading(false);
   }, []);
 
   const login = async (email: string) => {
-    const newUser = { ...MOCK_USER, email };
+    const existing = accounts.find(a => a.email === email);
+    if (existing) {
+      setUser(existing);
+      localStorage.setItem(SESSION_KEY, existing.uid);
+    } else {
+      throw new Error("Account not found");
+    }
+  };
+
+  const signup = async (name: string, email: string) => {
+    const newUser: User = {
+      uid: Math.random().toString(36).substr(2, 9),
+      email,
+      displayName: name,
+      theme: 'light',
+      savedRecipes: [],
+      preferences: {
+        diet: 'None',
+        skillLevel: 'Intermediate',
+        defaultServings: 2,
+        favoriteCuisines: [],
+        allergies: []
+      }
+    };
+    const updated = [...accounts, newUser];
+    setAccounts(updated);
     setUser(newUser);
-    localStorage.setItem('user_session', JSON.stringify(newUser));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    localStorage.setItem(SESSION_KEY, newUser.uid);
   };
 
   const logout = async () => {
     setUser(null);
-    localStorage.removeItem('user_session');
+    localStorage.removeItem(SESSION_KEY);
+  };
+
+  const switchAccount = (uid: string) => {
+    const target = accounts.find(a => a.uid === uid);
+    if (target) {
+      setUser(target);
+      localStorage.setItem(SESSION_KEY, target.uid);
+    }
   };
 
   const updatePreferences = (prefs: Partial<UserPreferences>) => {
     if (user) {
-      const updatedUser = {
-        ...user,
-        preferences: { ...user.preferences, ...prefs }
-      };
+      const updatedUser = { ...user, preferences: { ...user.preferences, ...prefs } };
+      const updatedAccounts = accounts.map(a => a.uid === user.uid ? updatedUser : a);
       setUser(updatedUser);
-      localStorage.setItem('user_session', JSON.stringify(updatedUser));
+      setAccounts(updatedAccounts);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAccounts));
     }
   };
 
+  const saveRecipe = (recipe: Recipe) => {
+    const updated = [...savedRecipes, recipe];
+    setSavedRecipes(updated);
+    localStorage.setItem(RECIPE_KEY, JSON.stringify(updated));
+  };
+
+  const deleteRecipe = (id: string) => {
+    const updated = savedRecipes.filter(r => r.id !== id);
+    setSavedRecipes(updated);
+    localStorage.setItem(RECIPE_KEY, JSON.stringify(updated));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updatePreferences }}>
+    <AuthContext.Provider value={{ 
+      user, accounts, loading, login, signup, logout, 
+      switchAccount, updatePreferences, saveRecipe, deleteRecipe, savedRecipes 
+    }}>
       {children}
     </AuthContext.Provider>
   );

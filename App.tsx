@@ -1,13 +1,25 @@
 
 import React, { useState } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Studio from './pages/Studio';
+import Login from './pages/Login';
+import Cookbook from './pages/Cookbook';
+import Settings from './pages/Settings';
 
-const App: React.FC = () => {
+const AuthenticatedApp: React.FC = () => {
+  const { user, loading } = useAuth();
   const [currentPath, setCurrentPath] = useState('/');
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-paper-50 dark:bg-charcoal-900">
+      <div className="w-12 h-12 border-4 border-saffron-200 border-t-saffron-500 rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!user) return <Login />;
 
   const renderPage = () => {
     switch (currentPath) {
@@ -16,28 +28,28 @@ const App: React.FC = () => {
       case '/studio':
         return <Studio />;
       case '/cookbook':
+        return <Cookbook />;
       case '/favorites':
+        return <Cookbook onlyFavorites />;
       case '/settings':
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
-            <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400">
-              <span className="text-4xl">🚧</span>
-            </div>
-            <h2 className="text-2xl font-bold">Coming Soon</h2>
-            <p className="text-slate-500 max-w-xs">We're working hard to bring this feature to you. Stay tuned!</p>
-          </div>
-        );
+        return <Settings />;
       default:
         return <Dashboard onNavigate={setCurrentPath} />;
     }
   };
 
   return (
+    <Layout activePath={currentPath} onNavigate={setCurrentPath}>
+      {renderPage()}
+    </Layout>
+  );
+};
+
+const App: React.FC = () => {
+  return (
     <ThemeProvider>
       <AuthProvider>
-        <Layout activePath={currentPath} onNavigate={setCurrentPath}>
-          {renderPage()}
-        </Layout>
+        <AuthenticatedApp />
       </AuthProvider>
     </ThemeProvider>
   );

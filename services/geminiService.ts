@@ -2,10 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Recipe } from "../types";
 
-// Note: Creating the instance here is okay as long as process.env.API_KEY is available at runtime.
-// In Vercel, ensure API_KEY is set in the Environment Variables.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 const recipeSchema = {
   type: Type.OBJECT,
   properties: {
@@ -44,7 +40,8 @@ const recipeSchema = {
         protein: { type: Type.STRING },
         carbs: { type: Type.STRING },
         fat: { type: Type.STRING }
-      }
+      },
+      required: ["calories", "protein", "carbs", "fat"]
     },
     servingSuggestions: { type: Type.STRING },
     substitutions: {
@@ -53,7 +50,11 @@ const recipeSchema = {
     },
     imagePrompt: { type: Type.STRING }
   },
-  required: ["title", "description", "mealType", "prepTime", "cookTime", "ingredients", "instructions", "nutrition", "imagePrompt", "servingSuggestions"]
+  required: [
+    "title", "description", "mealType", "prepTime", "cookTime", 
+    "ingredients", "instructions", "nutrition", "imagePrompt", 
+    "servingSuggestions", "servings", "difficulty"
+  ]
 };
 
 export async function generateRecipe(params: {
@@ -65,79 +66,97 @@ export async function generateRecipe(params: {
   spiceLevel?: string,
   cookingPreference?: string
 }): Promise<Recipe> {
-  const prompt = `You are ChefAI, an intelligent recipe companion. 
-    Generate a high-quality, practical recipe based on:
-    Available Ingredients: ${params.ingredients?.join(', ') || 'Any'}
-    Meal Type: ${params.mealType || 'Dinner'}
-    Dietary Preferences: ${params.diet || 'None'}
-    Cuisine/Country: ${params.cuisine || 'International'}
-    Spice Level: ${params.spiceLevel || 'Medium'}
-    Cooking Style: ${params.cookingPreference || 'Home-style'}
-    Skill Level: ${params.skill || 'Intermediate'}
-    
-    Guidelines:
-    - Use ONLY selected ingredients + basic kitchen staples (water, oil, salt, etc).
-    - Provide clear, numbered, beginner-friendly instructions.
-    - Focus on home-friendly practical cooking.
-    - Include specific serving suggestions and optional substitutions.
-    - No long explanations or fluff.`;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: recipeSchema,
-    },
-  });
-
-  const text = response.text;
-  if (!text) throw new Error("No response from AI");
-  const recipeData = JSON.parse(text.trim());
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   
-  return {
-    ...recipeData,
-    id: Math.random().toString(36).substr(2, 9),
-    dietaryNeeds: params.diet ? [params.diet] : [],
-    createdAt: Date.now()
-  };
+  const prompt = `You are ChefAI, an elite culinary intelligence specializing in authentic and fusion cuisine.
+    TASK: Generate a precise, professional recipe based on the user's input.
+    
+    USER PARAMETERS:
+    - Pantry: ${params.ingredients?.join(', ') || 'Any'}
+    - Meal: ${params.mealType || 'Dinner'}
+    - Diet: ${params.diet || 'None'}
+    - Cuisine Focus: ${params.cuisine || 'International'}
+    - Spice Level: ${params.spiceLevel || 'Medium'}
+    - Style: ${params.cookingPreference || 'Home-style'}
+    - Difficulty: ${params.skill || 'Intermediate'}
+    
+    REQUIREMENTS:
+    - Use provided ingredients as the base.
+    - Provide exact, actionable measurements.
+    - instructions must be a numbered list of steps.
+    - imagePrompt should be a high-quality description for a professional food photoshoot.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: recipeSchema,
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      console.error("Gemini API Error: Empty response body.", response);
+      throw new Error("Empty response from AI");
+    }
+
+    const recipeData = JSON.parse(text.trim());
+    
+    return {
+      ...recipeData,
+      id: Math.random().toString(36).substring(2, 11),
+      dietaryNeeds: params.diet && params.diet !== 'None' ? [params.diet] : [],
+      createdAt: Date.now()
+    };
+  } catch (err: any) {
+    console.error("ChefAI Engine Synthesis Failure:", err);
+    throw err;
+  }
 }
 
 export async function parseFiltersWithAI(text: string): Promise<any> {
-  const prompt = `Parse this request into keys: cuisine, diet, mealType, skill, spiceLevel, cookingPreference.
-  User: "${text}"
-  Return ONLY JSON.`;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const prompt = `Parse the following natural language cooking request into parameters:
+  " ${text} "
+  Return JSON with keys: cuisine, diet, mealType, skill, spiceLevel, cookingPreference.`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          cuisine: { type: Type.STRING },
-          diet: { type: Type.STRING },
-          mealType: { type: Type.STRING },
-          skill: { type: Type.STRING },
-          spiceLevel: { type: Type.STRING },
-          cookingPreference: { type: Type.STRING }
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cuisine: { type: Type.STRING },
+            diet: { type: Type.STRING },
+            mealType: { type: Type.STRING },
+            skill: { type: Type.STRING },
+            spiceLevel: { type: Type.STRING },
+            cookingPreference: { type: Type.STRING }
+          }
         }
       }
-    }
-  });
+    });
 
-  const parsedText = response.text;
-  if (!parsedText) return null;
-  return JSON.parse(parsedText.trim());
+    const parsedText = response.text;
+    return parsedText ? JSON.parse(parsedText.trim()) : null;
+  } catch (err) {
+    console.error("Filter parsing failure:", err);
+    return null;
+  }
 }
 
 export async function generateRecipeImage(prompt: string): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
-        parts: [{ text: `A professional food photography shot of ${prompt}. Gourmet, minimalist, soft light, 4k.` }]
+        parts: [{ text: `Professional food photography of ${prompt}. Gourmet plating, shallow depth of field, warm natural lighting, 4k resolution.` }]
       },
       config: {
         imageConfig: { aspectRatio: "16:9" }
@@ -145,24 +164,23 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
     });
 
     const candidate = response.candidates?.[0];
-    const parts = candidate?.content?.parts;
-    const part = parts?.find(p => p.inlineData);
+    const part = candidate?.content?.parts?.find(p => p.inlineData);
 
-    if (part?.inlineData) {
+    if (part?.inlineData?.data) {
       return `data:image/png;base64,${part.inlineData.data}`;
     }
     return 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&q=80&w=1000';
   } catch (err) {
-    console.error("Image generation failed:", err);
+    console.warn("Visual synthesis failed, using library default:", err);
     return 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&q=80&w=1000';
   }
 }
 
 export function createChefChat(recipe: Recipe) {
-  const systemInstruction = `You are ChefAI, an intelligent recipe companion. 
-    A user is cooking: "${recipe.title}". 
-    Help with substitutions, refinements, or scaling.
-    Be clean, structured, and practical.`;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const systemInstruction = `You are ChefAI assistant. You are helping the user with the recipe: "${recipe.title}".
+    Details: ${recipe.description}. Ingredients: ${recipe.ingredients.map(i => i.name).join(', ')}.
+    Answer questions about substitutions, scaling, or technique. Be professional and concise.`;
     
   return ai.chats.create({
     model: 'gemini-3-pro-preview',
