@@ -57,6 +57,32 @@ const recipeSchema = {
   ]
 };
 
+export async function analyzeIngredients(base64Image: string): Promise<string[]> {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const prompt = "Identify all the food ingredients visible in this image. Return a simple comma-separated list of the names only.";
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+          ]
+        }
+      ]
+    });
+    
+    const text = response.text;
+    if (!text) return [];
+    return text.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+  } catch (err) {
+    console.error("Visual Analysis Failure:", err);
+    return [];
+  }
+}
+
 export async function generateRecipe(params: {
   ingredients?: string[],
   diet?: string,
@@ -97,10 +123,7 @@ export async function generateRecipe(params: {
     });
 
     const text = response.text;
-    if (!text) {
-      console.error("Gemini API Error: Empty response body.", response);
-      throw new Error("Empty response from AI");
-    }
+    if (!text) throw new Error("Empty response from AI");
 
     const recipeData = JSON.parse(text.trim());
     
