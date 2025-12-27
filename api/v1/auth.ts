@@ -4,12 +4,13 @@ export default async function handler(req: any, res: any) {
   try {
     if (method === 'POST') {
       const { email, username, action } = req.body;
+      const safeEmail: string = typeof email === 'string' ? email : 'user@example.com';
 
       if (action === 'register') {
         const newUser = { 
-          uid: Math.random().toString(36).substr(2, 9), 
-          username: username || (typeof email === 'string' ? email.split('@')[0] : 'user'), 
-          email,
+          uid: Math.random().toString(36).substring(2, 11), 
+          username: username || safeEmail.split('@')[0], 
+          email: safeEmail,
           preferences: {
             diet: 'None',
             skillLevel: 'Intermediate',
@@ -28,9 +29,9 @@ export default async function handler(req: any, res: any) {
 
       if (action === 'login') {
         const user = { 
-          uid: "user_" + (typeof email === 'string' ? btoa(email).substr(0, 8) : Math.random().toString(36).substr(2, 8)), 
-          username: typeof email === 'string' ? email.split('@')[0] : 'user', 
-          email,
+          uid: "user_" + btoa(safeEmail).substring(0, 8), 
+          username: safeEmail.split('@')[0], 
+          email: safeEmail,
           preferences: {
             diet: 'None',
             skillLevel: 'Intermediate',
@@ -54,6 +55,7 @@ export default async function handler(req: any, res: any) {
 
       try {
         const token = authHeader.split(' ')[1];
+        if (!token) throw new Error("No token provided");
         const user = JSON.parse(atob(token));
         return res.status(200).json({ status: "success", user });
       } catch (e) {

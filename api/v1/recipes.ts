@@ -49,30 +49,30 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ status: "error", message: "Method not allowed" });
 
   const { ingredients, diet, cuisine, action, prompt } = req.body;
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey || typeof apiKey !== 'string') {
+  const envKey = process.env.API_KEY;
+  if (!envKey) {
     return res.status(500).json({ status: "error", message: "API Configuration Missing" });
   }
+  const apiKey: string = envKey;
 
   const ai = new GoogleGenAI({ apiKey });
 
   try {
     if (action === 'image') {
-      const imgPrompt = typeof prompt === 'string' ? prompt : 'Gourmet recipe plating';
+      const imgPrompt = typeof prompt === 'string' ? prompt : 'Gourmet plating';
       const imgResult = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: imgPrompt }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
       
-      let base64Data = "";
+      let base64Data: string = "";
       const candidates = imgResult.candidates;
       if (candidates && candidates.length > 0) {
-        const contentParts = candidates[0].content?.parts;
-        if (contentParts) {
-          const imagePart = contentParts.find(p => p.inlineData);
-          if (imagePart && imagePart.inlineData) {
+        const content = candidates[0].content;
+        if (content && content.parts) {
+          const imagePart = content.parts.find(p => !!p.inlineData);
+          if (imagePart && imagePart.inlineData && imagePart.inlineData.data) {
             base64Data = imagePart.inlineData.data;
           }
         }
@@ -94,7 +94,7 @@ export default async function handler(req: any, res: any) {
       }
     });
 
-    const responseText = response.text;
+    const responseText: string = response.text ?? "";
     if (!responseText) {
       throw new Error("Synthesis failed: The model returned an empty response.");
     }
