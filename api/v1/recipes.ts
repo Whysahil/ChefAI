@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 const recipeSchema = {
@@ -49,29 +48,45 @@ const recipeSchema = {
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ status: "error", message: "Method not allowed" });
 
-  const { ingredients, diet, cuisine, action } = req.body;
+  const { ingredients, diet, cuisine, action, prompt } = req.body;
   const apiKey = process.env.API_KEY;
 
-  if (!apiKey) return res.status(500).json({ status: "error", message: "API Configuration Missing" });
+  if (!apiKey || typeof apiKey !== 'string') {
+    return res.status(500).json({ status: "error", message: "API Configuration Missing" });
+  }
 
   const ai = new GoogleGenAI({ apiKey });
 
   try {
     if (action === 'image') {
+      const imgPrompt = typeof prompt === 'string' ? prompt : 'Gourmet recipe plating';
       const imgResult = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: req.body.prompt }] },
+        contents: { parts: [{ text: imgPrompt }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
       
+      let base64Data = "";
       const candidates = imgResult.candidates;
-      const data = candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data || "";
-      return res.status(200).json({ status: "success", data });
+      if (candidates && candidates.length > 0) {
+        const contentParts = candidates[0].content?.parts;
+        if (contentParts) {
+          const imagePart = contentParts.find(p => p.inlineData);
+          if (imagePart && imagePart.inlineData) {
+            base64Data = imagePart.inlineData.data;
+          }
+        }
+      }
+      return res.status(200).json({ status: "success", data: base64Data });
     }
+
+    const ingredientsList = Array.isArray(ingredients) ? ingredients.join(', ') : 'common pantry staples';
+    const cuisineStyle = typeof cuisine === 'string' ? cuisine : 'Standard';
+    const dietPreference = typeof diet === 'string' ? diet : 'None';
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Create a professional recipe using: ${ingredients?.join(', ') || 'available staples'}. Style: ${cuisine || 'Standard'}. Diet: ${diet || 'Standard'}.`,
+      contents: `Create a professional recipe using: ${ingredientsList}. Style: ${cuisineStyle}. Diet: ${dietPreference}.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: recipeSchema,
@@ -80,8 +95,8 @@ export default async function handler(req: any, res: any) {
     });
 
     const responseText = response.text;
-    if (typeof responseText !== 'string') {
-      throw new Error("Synthesis failed: Model returned no text output.");
+    if (!responseText) {
+      throw new Error("Synthesis failed: The model returned an empty response.");
     }
 
     return res.status(200).json({

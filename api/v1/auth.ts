@@ -1,4 +1,3 @@
-
 export default async function handler(req: any, res: any) {
   const { method } = req;
 
@@ -9,7 +8,7 @@ export default async function handler(req: any, res: any) {
       if (action === 'register') {
         const newUser = { 
           uid: Math.random().toString(36).substr(2, 9), 
-          username: username || email.split('@')[0], 
+          username: username || (typeof email === 'string' ? email.split('@')[0] : 'user'), 
           email,
           preferences: {
             diet: 'None',
@@ -29,8 +28,8 @@ export default async function handler(req: any, res: any) {
 
       if (action === 'login') {
         const user = { 
-          uid: "user_" + btoa(email).substr(0, 8), 
-          username: email.split('@')[0], 
+          uid: "user_" + (typeof email === 'string' ? btoa(email).substr(0, 8) : Math.random().toString(36).substr(2, 8)), 
+          username: typeof email === 'string' ? email.split('@')[0] : 'user', 
           email,
           preferences: {
             diet: 'None',

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 const recipeSchema = {
@@ -66,7 +65,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ status: apiKey ? 'healthy' : 'unconfigured' });
   }
 
-  if (!apiKey) {
+  if (!apiKey || typeof apiKey !== 'string') {
     return res.status(500).json({ 
       status: "error", 
       error: 'API_KEY_MISSING', 
@@ -78,7 +77,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     switch (action) {
-      case 'generate':
+      case 'generate': {
         const promptText = typeof payload?.prompt === 'string' ? payload.prompt : 'Create a masterpiece recipe.';
         const genResult = await ai.models.generateContent({
           model: 'gemini-3-pro-preview',
@@ -93,14 +92,16 @@ export default async function handler(req: any, res: any) {
           },
         });
         
-        const responseText = genResult.text;
-        if (typeof responseText !== 'string') {
-          throw new Error("The synthesis engine returned an empty or invalid text response.");
+        const text = genResult.text;
+        if (!text) {
+          throw new Error("The synthesis engine returned an empty text response.");
         }
-        return res.status(200).json({ status: "success", text: responseText });
+        return res.status(200).json({ status: "success", text });
+      }
 
-      case 'analyze':
-        if (!payload?.image || typeof payload.image !== 'string') {
+      case 'analyze': {
+        const imagePayload = payload?.image;
+        if (!imagePayload || typeof imagePayload !== 'string') {
           return res.status(400).json({ status: "error", message: "Image data is required for analysis." });
         }
         const visionResult = await ai.models.generateContent({
@@ -108,30 +109,31 @@ export default async function handler(req: any, res: any) {
           contents: [{
             parts: [
               { text: "Identify all culinary ingredients in this image. List them clearly, separated by commas." },
-              { inlineData: { mimeType: "image/jpeg", data: payload.image } }
+              { inlineData: { mimeType: "image/jpeg", data: imagePayload } }
             ]
           }]
         });
-        const visionText = visionResult.text;
-        if (typeof visionText !== 'string') {
+        const text = visionResult.text;
+        if (!text) {
           throw new Error("Vision analysis failed to return a textual description.");
         }
-        return res.status(200).json({ status: "success", text: visionText });
+        return res.status(200).json({ status: "success", text });
+      }
 
-      case 'image':
-        const imgPromptText = typeof payload?.prompt === 'string' ? payload.prompt : 'Gourmet food plating';
+      case 'image': {
+        const promptText = typeof payload?.prompt === 'string' ? payload.prompt : 'Gourmet food plating';
         const imgResult = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: imgPromptText }] },
+          contents: { parts: [{ text: promptText }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         });
         
         let base64Data = '';
         const candidates = imgResult.candidates;
         if (candidates && candidates.length > 0) {
-          const content = candidates[0].content;
-          if (content && content.parts) {
-            for (const part of content.parts) {
+          const contentParts = candidates[0].content?.parts;
+          if (contentParts) {
+            for (const part of contentParts) {
               if (part.inlineData) {
                 base64Data = part.inlineData.data;
                 break;
@@ -140,6 +142,7 @@ export default async function handler(req: any, res: any) {
           }
         }
         return res.status(200).json({ status: "success", data: base64Data });
+      }
 
       default:
         return res.status(400).json({ status: "error", error: 'INVALID_ACTION' });
