@@ -65,13 +65,13 @@ export default async function handler(req: any, res: any) {
       });
       
       const candidates = imgResult.candidates;
-      const data = candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      const data = candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data || "";
       return res.status(200).json({ status: "success", data });
     }
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Create a professional recipe using: ${ingredients.join(', ')}. Style: ${cuisine}. Diet: ${diet}.`,
+      contents: `Create a professional recipe using: ${ingredients?.join(', ') || 'available staples'}. Style: ${cuisine || 'Standard'}. Diet: ${diet || 'Standard'}.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: recipeSchema,
@@ -80,7 +80,9 @@ export default async function handler(req: any, res: any) {
     });
 
     const responseText = response.text;
-    if (!responseText) throw new Error("Synthesis failed: Empty response text.");
+    if (typeof responseText !== 'string') {
+      throw new Error("Synthesis failed: Model returned no text output.");
+    }
 
     return res.status(200).json({
       status: "success",
