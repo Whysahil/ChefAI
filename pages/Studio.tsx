@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Utensils, Mic, Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Camera, Save, Check, RefreshCw, AlertCircle } from 'lucide-react';
+import { Utensils, Mic, Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Camera, Save, Check, RefreshCw, AlertCircle, Terminal } from 'lucide-react';
 import { generateRecipe, generateRecipeImage, analyzeIngredients } from '../services/geminiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -44,7 +44,7 @@ const Studio: React.FC = () => {
       setGeneratedRecipe({ ...recipe, imageUrl });
     } catch (err: any) { 
       console.error("Synthesis Error:", err);
-      if (err.message?.includes("API_KEY") || err.message?.includes("400") || err.message?.includes("key")) {
+      if (err.message === "API_KEY_MISSING" || err.message?.includes("400") || err.message?.includes("key")) {
         setErrorState("API_CONFIGURATION_REQUIRED");
       } else {
         setErrorState("SYNTHESIS_INTERRUPTED");
@@ -55,6 +55,7 @@ const Studio: React.FC = () => {
   };
 
   const toggleIngredient = (ing: string) => setIngredients(prev => prev.includes(ing) ? prev.filter(i => i !== ing) : [...prev, ing]);
+  
   const addCustomIngredient = () => {
     if (inputValue.trim() && !ingredients.includes(inputValue.trim().toLowerCase())) {
       setIngredients(prev => [...prev, inputValue.trim().toLowerCase()]);
@@ -70,14 +71,26 @@ const Studio: React.FC = () => {
             <ShieldAlert size={40} />
           </div>
           <div className="space-y-4">
-            <h2 className="text-3xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic">Calibration Required.</h2>
+            <h2 className="text-3xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">System Offline.</h2>
             <p className="text-neutral-500 font-medium leading-relaxed">
-              The ChefAI synthesis engine is offline. Please ensure the <code className="bg-neutral-100 dark:bg-neutral-900 px-2 py-1 rounded text-saffron-600">API_KEY</code> environment variable is correctly configured in your Vercel Dashboard or local <code className="bg-neutral-100 dark:bg-neutral-900 px-2 py-1 rounded">.env</code> file.
+              The ChefAI synthesis engine requires a valid <span className="text-saffron-600 font-bold">API_KEY</span>. 
+              Please verify your Vercel Environment Variables or local <code className="bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded text-saffron-500">.env</code> configuration.
             </p>
+          </div>
+          <div className="bg-neutral-50 dark:bg-neutral-900 p-4 rounded-2xl text-left border border-neutral-100 dark:border-neutral-700">
+             <div className="flex items-center gap-2 mb-2">
+                <Terminal size={14} className="text-neutral-400" />
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">Resolution Protocol</span>
+             </div>
+             <p className="text-[11px] text-neutral-500 leading-normal">
+                1. Set <code className="text-saffron-500">API_KEY</code> in Project Settings.<br/>
+                2. Redeploy the application.<br/>
+                3. Ensure the key has Gemini API access.
+             </p>
           </div>
           <button 
             onClick={() => window.location.reload()} 
-            className="w-full py-5 bg-neutral-900 dark:bg-neutral-50 text-white dark:text-neutral-900 font-bold text-xs uppercase tracking-widest rounded-2xl hover:scale-[1.02] transition-transform"
+            className="w-full py-5 bg-neutral-900 dark:bg-neutral-50 text-white dark:text-neutral-900 font-bold text-xs uppercase tracking-widest rounded-2xl hover:scale-[1.02] transition-transform shadow-lg"
           >
             Retry Connection
           </button>
@@ -92,13 +105,13 @@ const Studio: React.FC = () => {
       <header className="flex flex-col lg:flex-row gap-8 lg:items-center">
         <div className="flex-1 space-y-6">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-saffron-50 dark:bg-saffron-900/10 text-saffron-600 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-saffron-100/50">
-            <Sparkles size={14} /> Module V4.1 • Production Ready
+            <Sparkles size={14} /> Production Node • Stable
           </div>
           <h2 className="text-5xl md:text-7xl font-serif font-black tracking-tight text-neutral-900 dark:text-neutral-50 uppercase italic leading-[0.9]">
             Synthesis<br/><span className="text-saffron-500">Laboratory.</span>
           </h2>
           <p className="text-neutral-500 font-medium text-lg md:text-xl max-w-2xl leading-relaxed">
-            Audit your pantry to generate calibrated culinary blueprints using production-grade AI models.
+            Audit your pantry and generate calibrated culinary blueprints using our server-hardened AI synthesis engine.
           </p>
         </div>
       </header>
@@ -170,9 +183,10 @@ const Studio: React.FC = () => {
 
         <div className="lg:col-span-7">
           {isGenerating ? (
-            <div className="min-h-[500px] flex flex-col items-center justify-center p-12 bg-white dark:bg-neutral-800 rounded-[2.5rem] border border-neutral-200 dark:border-neutral-800 shadow-sm animate-pulse">
+            <div className="min-h-[500px] flex flex-col items-center justify-center p-12 bg-white dark:bg-neutral-800 rounded-[2.5rem] border border-neutral-200 dark:border-neutral-700 shadow-sm animate-pulse">
                <ChefHat size={40} className="text-saffron-500 animate-bounce mb-6" />
                <h2 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic">Mapping Vectors...</h2>
+               <p className="mt-4 text-neutral-400 font-medium">Communicating with synthesis engine.</p>
             </div>
           ) : generatedRecipe ? (
             <div className="space-y-10 animate-slide-up">
@@ -212,6 +226,7 @@ const Studio: React.FC = () => {
             <div className="min-h-[500px] flex flex-col items-center justify-center p-12 bg-neutral-50/50 dark:bg-neutral-800/20 rounded-[2.5rem] border-2 border-dashed border-neutral-200 dark:border-neutral-800">
                <ChefHat size={48} className="text-neutral-200 dark:text-neutral-700 mb-6" />
                <h3 className="text-xl font-serif font-black text-neutral-500 uppercase italic">Ready for Synthesis</h3>
+               <p className="mt-2 text-neutral-400 text-sm">Select ingredients to begin protocol.</p>
             </div>
           )}
         </div>

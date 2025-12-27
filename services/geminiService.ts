@@ -57,9 +57,16 @@ const recipeSchema = {
   ]
 };
 
+/**
+ * Robust AI Instance factory.
+ * Adheres to @google/genai guidelines while providing runtime validation.
+ */
 const getAIInstance = () => {
   const apiKey = process.env.API_KEY;
-  return new GoogleGenAI({ apiKey: apiKey || '' });
+  if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    throw new Error("API_KEY_MISSING");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export async function analyzeIngredients(base64Image: string): Promise<string[]> {
@@ -70,7 +77,7 @@ export async function analyzeIngredients(base64Image: string): Promise<string[]>
       contents: [
         {
           parts: [
-            { text: "List food ingredients visible in this image. Return a comma-separated list." },
+            { text: "Identify the food ingredients in this image. Provide a comma-separated list." },
             { inlineData: { mimeType: "image/jpeg", data: base64Image } }
           ]
         }
@@ -81,8 +88,8 @@ export async function analyzeIngredients(base64Image: string): Promise<string[]>
     const text = response.text;
     if (!text) return [];
     return text.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
-  } catch (err) {
-    console.error("ChefAI Vision Failure:", err);
+  } catch (err: any) {
+    console.error("ChefAI Vision Error:", err);
     throw err;
   }
 }
@@ -96,12 +103,13 @@ async function attemptRecipeGeneration(modelName: string, prompt: string): Promi
       responseMimeType: "application/json",
       responseSchema: recipeSchema,
       maxOutputTokens: 10000,
+      // Disable thinking for Flash to avoid capacity errors on base keys
       thinkingConfig: { thinkingBudget: modelName.includes('pro') ? 2000 : 0 }
     },
   });
 
   const text = response.text;
-  if (!text) throw new Error("Empty response from AI service.");
+  if (!text) throw new Error("Synthesis failed to produce content.");
 
   const cleanJson = text.replace(/^[^{]*({.*})[^}]*$/s, '$1').trim();
   const recipeData = JSON.parse(cleanJson);
@@ -123,15 +131,16 @@ export async function generateRecipe(params: {
   spiceLevel?: string,
   cookingPreference?: string
 }): Promise<Recipe> {
-  const prompt = `Synthesize a professional recipe. 
-    Ingredients: ${params.ingredients?.join(', ') || 'Pantry basics'}
-    Style: ${params.cuisine}
-    Diet: ${params.diet}`;
+  const prompt = `Synthesize a professional recipe for a ${params.skill} level cook.
+    Ingredients provided: ${params.ingredients?.join(', ') || 'General pantry staples'}.
+    Cuisine target: ${params.cuisine}.
+    Dietary preferences: ${params.diet}.`;
 
   try {
     return await attemptRecipeGeneration('gemini-3-flash-preview', prompt);
-  } catch (err) {
-    console.warn("Retrying with high-precision model...");
+  } catch (err: any) {
+    if (err.message === "API_KEY_MISSING") throw err;
+    console.warn("ChefAI: Switching to high-precision reasoning fallback...");
     return await attemptRecipeGeneration('gemini-3-pro-preview', prompt);
   }
 }
@@ -142,7 +151,7 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
-        parts: [{ text: `Professional food photography: ${prompt}` }]
+        parts: [{ text: `Professional gourmet food photography of ${prompt}. Cinematic lighting, macro detail.` }]
       },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
@@ -150,6 +159,7 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : '';
   } catch (err) {
+    console.warn("ChefAI: Visual synthesis omitted due to key restrictions.");
     return 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
   }
 }
@@ -158,6 +168,6 @@ export function createChefChat(recipe: Recipe) {
   const ai = getAIInstance();
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
-    config: { systemInstruction: `Expert culinary assistant for "${recipe.title}".` }
+    config: { systemInstruction: `You are the ChefAI assistant for "${recipe.title}". Provide expert culinary guidance.` }
   });
 }
