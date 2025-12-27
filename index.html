@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ChefAI | Indian Culinary Intelligence</title>
+    <title>ChefAI | Culinary Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap" rel="stylesheet">
     <script>
@@ -13,104 +13,111 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
               serif: ['Playfair Display', 'serif'],
             },
             colors: {
+              // Calibrated Earth-Tones
               saffron: {
-                50: '#fff9ed',
-                100: '#ffefd1',
-                500: '#f59e0b',
-                600: '#d97706',
-                700: '#b45309',
+                50: '#fff9f2',
+                100: '#fff1e0',
+                500: '#e67e22', // sRGB-safe, natural orange
+                600: '#d35400',
               },
               curry: {
-                50: '#f0fdf4',
-                500: '#166534',
-                600: '#15803d',
-                900: '#064e3b',
+                50: '#f4f7f5',
+                500: '#2c3e50',
+                900: '#1a252f',
               },
-              turmeric: {
-                400: '#fbbf24',
-                500: '#f59e0b',
+              // Neutral Calibration
+              neutral: {
+                50: '#f9fafb',   // Base Light (Soft off-white)
+                100: '#f3f4f6',  // Secondary Surface
+                200: '#e5e7eb',  // Borders
+                800: '#1f2937',  // Primary Dark Text
+                900: '#111827',  // Base Dark Mode (Deep Slate)
               },
               paprika: {
-                600: '#dc2626',
-              },
-              paper: {
-                50: '#fdfbf7',
-                100: '#f5f0e6',
-              },
-              charcoal: {
-                800: '#1a1a1a',
-                900: '#0f0f0f',
+                600: '#c0392b', // Natural crimson
               }
             },
             animation: {
-              'fade-in': 'fadeIn 0.6s ease-out forwards',
-              'slide-up': 'slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'slide-up': 'slideUp 0.6s cubic-bezier(0.2, 0, 0, 1) forwards',
             },
             keyframes: {
               fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-              slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+              slideUp: { '0%': { transform: 'translateY(12px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
             }
           }
         }
       }
     </script>
     <style>
-      :root { color-scheme: light; }
+      :root { 
+        color-scheme: light; 
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
       .dark { color-scheme: dark; }
       
       body {
-        -webkit-font-smoothing: antialiased;
-        transition: background-color 0.4s ease, color 0.4s ease;
-        background-color: #fdfbf7;
-        background-image: url("https://www.transparenttextures.com/patterns/handmade-paper.png");
+        transition: background-color 0.3s ease, color 0.3s ease;
+        background-color: #f9fafb;
+        line-height: 1.6;
       }
+      
       .dark body {
-        background-color: #0f0f0f;
-        background-image: none;
+        background-color: #111827;
       }
+
       .mandala-bg {
         position: fixed;
-        top: -10%;
-        right: -10%;
-        width: 600px;
-        height: 600px;
-        opacity: 0.03;
+        top: -5%;
+        right: -5%;
+        width: 500px;
+        height: 500px;
+        opacity: 0.04;
         pointer-events: none;
         z-index: 0;
-        transform: rotate(15deg);
+        filter: grayscale(1);
       }
       .dark .mandala-bg {
-        opacity: 0.01;
+        opacity: 0.02;
+        filter: invert(1) grayscale(1);
       }
+
       .glass {
-        background: rgba(253, 251, 247, 0.8);
-        backdrop-filter: blur(12px);
+        background: rgba(249, 250, 251, 0.75);
+        backdrop-filter: saturate(180%) blur(20px);
       }
       .dark .glass {
-        background: rgba(15, 15, 15, 0.8);
+        background: rgba(17, 24, 39, 0.75);
       }
-      ::selection {
-        background: #f59e0b;
-        color: white;
-      }
-      .recipe-scroll::-webkit-scrollbar { width: 4px; }
-      .recipe-scroll::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 10px; }
-      .no-scrollbar::-webkit-scrollbar { display: none; }
-      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-      /* Fix for native select options in dark mode */
+      /* Native Element Styling for Accuracy */
+      select, input {
+        border-radius: 8px;
+        appearance: none;
+      }
       select option {
-        background-color: #fdfbf7;
-        color: #1a1a1a;
+        background-color: #f9fafb;
+        color: #111827;
       }
       .dark select option {
-        background-color: #1a1a1a;
-        color: #f1f5f9;
+        background-color: #1f2937;
+        color: #f9fafb;
       }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { 
+        background: rgba(156, 163, 175, 0.3); 
+        border-radius: 10px; 
+      }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
     </style>
   <script type="importmap">
 {
@@ -126,7 +133,7 @@
 }
 </script>
 </head>
-  <body class="text-charcoal-800 dark:text-slate-50 min-h-screen">
+  <body class="text-neutral-800 dark:text-neutral-50 min-h-screen selection:bg-saffron-500 selection:text-white">
     <img src="https://cdn.pixabay.com/photo/2017/09/01/21/53/mandala-2705640_1280.png" class="mandala-bg" alt="" />
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>

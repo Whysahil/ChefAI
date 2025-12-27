@@ -7,99 +7,95 @@ const Dashboard: React.FC<{ onNavigate: (path: string) => void }> = ({ onNavigat
   const { user } = useAuth();
 
   const insights = [
-    { name: 'CULINARY LOGS', value: '12 Recipes', icon: <ChefHat size={18} /> },
-    { name: 'COOKBOOK', value: '28 Saved', icon: <BookOpen size={18} /> },
-    { name: 'KITCHEN TIME', value: '15 Hours', icon: <Clock size={18} /> },
-    { name: 'FAVORITES', value: '8 Picks', icon: <Heart size={18} /> },
+    { name: 'CULINARY LOGS', value: '12 Recipes', icon: <ChefHat size={16} /> },
+    { name: 'COOKBOOK', value: '28 Saved', icon: <BookOpen size={16} /> },
+    { name: 'KITCHEN TIME', value: '15 Hours', icon: <Clock size={16} /> },
+    { name: 'FAVORITES', value: '8 Picks', icon: <Heart size={16} /> },
   ];
 
   return (
-    <div className="space-y-20 animate-slide-up pb-10">
-      {/* Editorial Hero: Modern Indian Vibe */}
-      <div className="relative group">
-        <div className="absolute inset-0 bg-charcoal-900 rounded-[3rem] overflow-hidden shadow-2xl">
-          <img 
-            src="https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&q=80&w=2000" 
-            alt="Indian Spices & Cooking" 
-            className="w-full h-full object-cover opacity-40 grayscale-[40%] hover:grayscale-0 transition-all duration-1000 scale-105 group-hover:scale-100"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-charcoal-900 via-charcoal-900/60 to-transparent" />
-          <div className="absolute top-0 right-0 p-12 opacity-5">
-            <img src="https://cdn.pixabay.com/photo/2017/09/01/21/53/mandala-2705640_1280.png" className="w-96 h-96" alt="" />
-          </div>
-        </div>
+    <div className="space-y-12 md:space-y-16 animate-slide-up">
+      {/* Visual Header Section */}
+      <div className="relative h-80 md:h-[450px] rounded-[2rem] overflow-hidden shadow-xl border border-neutral-200 dark:border-neutral-800 group">
+        <img 
+          src="https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&q=80&w=2000" 
+          alt="Culinary Inspiration" 
+          className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700 scale-100 group-hover:scale-105"
+        />
+        {/* Neutral Neutral-Density Gradient to preserve tones */}
+        <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/90 via-neutral-900/40 to-transparent" />
         
-        <div className="relative z-10 px-16 py-28 space-y-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 text-saffron-500 font-bold text-[10px] tracking-[0.3em] uppercase bg-saffron-900/20 px-4 py-2 rounded-full border border-saffron-500/20">
-            <Sparkles size={14} /> Traditional Heart, AI Brain
+        <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-16 space-y-4 md:space-y-6 max-w-4xl">
+          <div className="inline-flex items-center gap-2 text-saffron-500 font-bold text-[10px] tracking-widest uppercase bg-neutral-900/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-neutral-700">
+            <Sparkles size={14} /> Traditional Wisdom • AI Precision
           </div>
-          <h1 className="text-6xl md:text-7xl font-serif font-black text-white tracking-tight leading-[0.9]">
-            Homestyle cooking, <br/> 
-            <span className="text-saffron-500 italic">evolved.</span>
+          <h1 className="text-4xl md:text-6xl font-serif font-black text-white tracking-tight leading-tight">
+            Elevating Traditions <br/> 
+            <span className="text-saffron-500 italic">via Intelligence.</span>
           </h1>
-          <p className="text-xl text-slate-300 font-normal leading-relaxed tracking-tight max-w-xl">
-            ChefAI blends the warmth of traditional Indian recipes with the precision of culinary intelligence. Ready for your next masterpiece?
+          <p className="text-base md:text-lg text-neutral-300 font-medium leading-relaxed max-w-2xl">
+            Experience culinary synthesis that respects original textures and tones. Calibrated for visual clarity and long-term kitchen comfort.
           </p>
-          <div className="flex flex-wrap gap-6 pt-4">
+          <div className="flex flex-wrap gap-4 pt-2">
             <button 
               onClick={() => onNavigate('/studio')}
-              className="bg-saffron-500 text-white px-10 py-5 rounded-full font-bold text-xs uppercase tracking-widest flex items-center gap-4 hover:bg-saffron-600 transition-all duration-500 shadow-xl shadow-saffron-500/30"
+              className="bg-saffron-500 text-white px-8 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-saffron-600 transition-all shadow-lg shadow-saffron-500/20"
             >
-              Enter Studio <ArrowRight size={18} />
+              Enter Studio <ArrowRight size={16} />
             </button>
             <button 
-              className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-10 py-5 rounded-full font-bold text-xs uppercase tracking-widest hover:bg-white/20 transition-all duration-500"
+              className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-white/20 transition-all"
             >
-              Explore Traditions
+              View Archives
             </button>
           </div>
         </div>
       </div>
 
-      {/* Insight Grid: Indian Palette */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Insight Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {insights.map((insight, i) => (
-          <div key={i} className="bg-white dark:bg-charcoal-800 p-10 rounded-[2.5rem] border border-paper-100 dark:border-white/5 shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-500">
-            <div className="text-saffron-500 mb-8 p-4 bg-saffron-50 dark:bg-saffron-900/10 w-fit rounded-2xl group-hover:scale-110 transition-transform duration-500">
+          <div key={i} className="bg-white dark:bg-neutral-800 p-6 md:p-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 transition-all hover:border-saffron-500/50">
+            <div className="text-saffron-500 mb-6 p-3 bg-saffron-50 dark:bg-saffron-900/20 w-fit rounded-xl">
               {insight.icon}
             </div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{insight.name}</p>
-            <p className="text-4xl font-serif font-black tracking-tight text-curry-900 dark:text-white leading-none">{insight.value}</p>
+            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{insight.name}</p>
+            <p className="text-2xl md:text-3xl font-serif font-black text-neutral-900 dark:text-neutral-50 leading-none">{insight.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        {/* Activity Logs */}
-        <section className="lg:col-span-7 space-y-10">
-          <div className="flex justify-between items-end px-4">
-            <h3 className="text-3xl font-serif font-black tracking-tight text-curry-900 dark:text-white flex items-center gap-4">
-              <div className="w-2 h-8 bg-saffron-500 rounded-full" />
-              Culinary Records
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12">
+        {/* Activity Feed */}
+        <section className="lg:col-span-7 space-y-8">
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50 flex items-center gap-3">
+              <div className="w-1.5 h-6 bg-saffron-500 rounded-full" />
+              Recent Synthesis
             </h3>
-            <button className="text-[10px] font-bold text-saffron-600 hover:text-paprika-600 transition-colors uppercase tracking-widest border-b border-saffron-200">View Archive</button>
+            <button className="text-[10px] font-bold text-neutral-400 hover:text-saffron-500 transition-colors uppercase tracking-widest">History</button>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[
-              { title: 'Tandoori Mushroom Tikka', type: 'Synthesis Completed', date: '2h ago', icon: <Flame className="text-paprika-600" size={16} /> },
-              { title: 'Mysore Masala Dosa', type: 'Saved to Traditions', date: 'Yesterday', icon: <Heart className="text-paprika-600" size={16} /> },
-              { title: 'Ghee Roast Chicken', type: 'Intelligence Map Built', date: '3d ago', icon: <Sparkles className="text-saffron-500" size={16} /> }
+              { title: 'Signature Garlic Naan', type: 'Synthesis Complete', date: '45m ago', icon: <Flame className="text-paprika-600" size={16} /> },
+              { title: 'Spicy Dal Tadka', type: 'Archived', date: 'Yesterday', icon: <Heart className="text-paprika-600" size={16} /> },
+              { title: 'Basmati Logic Map', type: 'Analysis Run', date: 'Oct 24', icon: <Sparkles className="text-saffron-500" size={16} /> }
             ].map((activity, i) => (
-              <div key={i} className="flex items-center justify-between p-8 bg-white dark:bg-charcoal-800 rounded-3xl border border-paper-100 dark:border-white/5 group hover:border-saffron-200 transition-all duration-300 shadow-sm">
-                <div className="flex items-center gap-8">
-                  <div className="w-14 h-14 bg-paper-50 dark:bg-charcoal-900 rounded-full flex items-center justify-center text-saffron-500 shadow-inner">
+              <div key={i} className="flex items-center justify-between p-5 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/80 transition-all">
+                <div className="flex items-center gap-6">
+                  <div className="w-10 h-10 bg-neutral-100 dark:bg-neutral-900 rounded-lg flex items-center justify-center text-saffron-500">
                     {activity.icon}
                   </div>
                   <div>
-                    <p className="font-bold text-lg tracking-tight text-curry-900 dark:text-white leading-none">{activity.title}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{activity.type}</p>
+                    <p className="font-bold text-base text-neutral-900 dark:text-neutral-50 leading-tight">{activity.title}</p>
+                    <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide mt-1">{activity.type}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-8">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{activity.date}</span>
-                  <div className="w-10 h-10 rounded-full border border-paper-100 dark:border-white/10 flex items-center justify-center group-hover:bg-saffron-500 group-hover:text-white transition-all duration-500">
-                    <ArrowRight size={16} />
+                <div className="flex items-center gap-6">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{activity.date}</span>
+                  <div className="w-8 h-8 rounded-full bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center text-neutral-300">
+                    <ArrowRight size={14} />
                   </div>
                 </div>
               </div>
@@ -108,46 +104,46 @@ const Dashboard: React.FC<{ onNavigate: (path: string) => void }> = ({ onNavigat
         </section>
 
         {/* Nutritional & Taste Section */}
-        <section className="lg:col-span-5 bg-paper-100 dark:bg-charcoal-800/40 p-12 rounded-[3.5rem] border border-white/50 dark:border-white/5 space-y-12">
-          <div className="space-y-4">
-            <h3 className="text-3xl font-serif font-black text-curry-900 dark:text-white">Taste Intelligence</h3>
-            <p className="text-sm text-slate-500 font-medium leading-relaxed">Your current profile leans heavily towards <span className="text-paprika-600 font-bold">Spicy</span> and <span className="text-saffron-600 font-bold">Umami</span> notes.</p>
+        <section className="lg:col-span-5 bg-neutral-100/50 dark:bg-neutral-800/40 p-8 md:p-10 rounded-[2rem] border border-neutral-200 dark:border-neutral-800 space-y-10">
+          <div className="space-y-3">
+            <h3 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50">Visual Palette Analysis</h3>
+            <p className="text-sm text-neutral-500 font-medium">Monitoring color accuracy across your culinary logs.</p>
           </div>
 
-          <div className="space-y-12">
-            <div className="space-y-4">
+          <div className="space-y-8">
+            <div className="space-y-3">
               <div className="flex justify-between items-end">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Homestyle Preference</span>
-                <span className="text-xl font-serif font-black text-curry-900 dark:text-white">92%</span>
+                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Chromatic Balance</span>
+                <span className="text-lg font-serif font-black text-neutral-900 dark:text-neutral-50">98% Corrected</span>
               </div>
-              <div className="h-2 bg-white dark:bg-charcoal-800 rounded-full overflow-hidden p-0.5">
-                <div className="h-full bg-gradient-to-r from-turmeric-400 to-saffron-500 rounded-full w-[92%] transition-all duration-1000" />
+              <div className="h-1.5 bg-white dark:bg-neutral-900 rounded-full overflow-hidden">
+                <div className="h-full bg-saffron-500 w-[98%] rounded-full" />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-12">
-              <div className="space-y-3">
-                <div className="p-3 bg-white dark:bg-charcoal-800 w-fit rounded-xl text-saffron-500 mb-2 shadow-sm">
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <div className="p-2.5 bg-white dark:bg-neutral-800 w-fit rounded-lg text-saffron-500 shadow-sm border border-neutral-100 dark:border-neutral-700">
                   <Coffee size={18} />
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Regional Affinity</p>
-                <p className="text-xl font-serif font-black text-curry-900 dark:text-white leading-none">South Indian</p>
+                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Regional Focus</p>
+                <p className="text-lg font-serif font-black text-neutral-900 dark:text-neutral-50 leading-none">Global Fusion</p>
               </div>
-              <div className="space-y-3">
-                <div className="p-3 bg-white dark:bg-charcoal-800 w-fit rounded-xl text-saffron-500 mb-2 shadow-sm">
+              <div className="space-y-2">
+                <div className="p-2.5 bg-white dark:bg-neutral-800 w-fit rounded-lg text-saffron-500 shadow-sm border border-neutral-100 dark:border-neutral-700">
                   <TrendingUp size={18} />
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Proficiency</p>
-                <p className="text-xl font-serif font-black text-curry-900 dark:text-white leading-none">Expert</p>
+                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Current Tier</p>
+                <p className="text-lg font-serif font-black text-neutral-900 dark:text-neutral-50 leading-none">Senior Chef</p>
               </div>
             </div>
 
-            <div className="pt-10 border-t border-white/40 dark:border-white/5 flex gap-6 items-start">
-              <div className="w-10 h-10 bg-saffron-500/10 rounded-full flex-shrink-0 flex items-center justify-center text-saffron-500">
-                <Sparkles size={18} />
+            <div className="pt-8 border-t border-neutral-200 dark:border-neutral-700 flex gap-4 items-start">
+              <div className="w-8 h-8 bg-saffron-500/10 rounded-lg flex-shrink-0 flex items-center justify-center text-saffron-500">
+                <Sparkles size={16} />
               </div>
-              <p className="text-xs font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic">
-                AI Suggestion: "Your frequent use of Curry Leaves and Mustard Seeds suggests an 18% match for Chettinad variations this week."
+              <p className="text-[11px] font-medium text-neutral-500 leading-relaxed italic">
+                AI Insight: "Your recipe density is high in vitamin-rich leafy greens this week. Suggesting a 2% increase in protein synthesis for balance."
               </p>
             </div>
           </div>
