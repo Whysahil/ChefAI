@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Check, AlertCircle, Terminal, Heart, Info, Utensils, RefreshCw, Key, Save, Circle, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Check, AlertCircle, Terminal, Heart, Info, Utensils, RefreshCw, Key, Save, Circle, CheckCircle2, AlertTriangle, ArrowRight, X } from 'lucide-react';
 import { generateRecipe, generateRecipeImage, checkServerHealth } from '../services/geminiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { CUISINES, SKILL_LEVELS, INGREDIENT_CATEGORIES, DIETS } from '../constants';
 import ChefChat from '../components/ChefChat';
 
-// Define the missing AIStudio interface in the global scope to fix the TS2304 error
+// Global interface for AIStudio to satisfy build requirements
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
@@ -37,7 +37,6 @@ const Studio: React.FC = () => {
   });
 
   const validationStatus = useMemo(() => {
-    // These categories contain the "main" ingredients the API layer requires
     const coreCategories = ['Vegetables', 'Proteins', 'Grains & Staples'];
     const coreItems = INGREDIENT_CATEGORIES
       .filter(cat => coreCategories.includes(cat.name))
@@ -102,7 +101,6 @@ const Studio: React.FC = () => {
     setValidationError(null);
     setErrorState(null);
 
-    // 1. Commit any pending manual input
     let finalIngredients = [...ingredients];
     if (inputValue.trim()) {
       const added = inputValue.trim().toLowerCase();
@@ -113,9 +111,8 @@ const Studio: React.FC = () => {
       }
     }
 
-    // 2. Local Validation
     if (finalIngredients.length === 0) {
-      setValidationError("Input matrix is empty. Please add ingredients.");
+      setValidationError("Input matrix is empty. Please add items.");
       return;
     }
 
@@ -124,11 +121,11 @@ const Studio: React.FC = () => {
       return;
     }
 
-    // 3. Trigger Synthesis
     setIsGenerating(true);
     setGeneratedRecipe(null);
     
     try {
+      // Step 1: Generate Recipe Logic
       const recipe = await generateRecipe({ 
         ingredients: finalIngredients, 
         diet: prefs.diet,
@@ -137,16 +134,19 @@ const Studio: React.FC = () => {
         skill: prefs.skill 
       });
       
+      // Step 2: Show recipe content as early as possible
+      setGeneratedRecipe(recipe);
+      
+      // Step 3: Lazy-load high-fidelity imagery (handled inside generateRecipeImage)
       const imageUrl = await generateRecipeImage(recipe.imagePrompt);
-      setGeneratedRecipe({ ...recipe, imageUrl });
+      setGeneratedRecipe(prev => prev ? { ...prev, imageUrl } : null);
+      
     } catch (err: any) { 
       console.error("Synthesis Failed:", err);
-      if (err.status === "API_KEY_INVALID") {
+      if (err.status === "API_KEY_INVALID" || err.message?.includes("key")) {
         setErrorState("API_CONFIGURATION_REQUIRED");
-      } else if (err.status === "invalid_input") {
-        setValidationError(err.message);
       } else {
-        setErrorState(err.message || "Synthesis Interrupted");
+        setErrorState(err.message || "Synthesis Interrupted. Please check connectivity.");
       }
     } finally { 
       setIsGenerating(false); 
@@ -176,7 +176,7 @@ const Studio: React.FC = () => {
           </div>
           <div className="space-y-4 text-center">
             <h2 className="text-4xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic leading-tight">Engine Offline</h2>
-            <p className="text-neutral-400 font-medium">REST layer requires a valid API key. Keys are handled securely on the server.</p>
+            <p className="text-neutral-400 font-medium">REST layer requires a valid API key selection. Keys are handled securely on the server.</p>
           </div>
           <button onClick={handleOpenKeySelector} className="w-full py-6 bg-saffron-500 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 rounded-[2rem] hover:bg-saffron-600 transition-all shadow-2xl shadow-saffron-500/20">
             Select API Key <Key size={18} />
@@ -198,8 +198,23 @@ const Studio: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        {/* Sidebar Inputs */}
+        {/* Sidebar Controls */}
         <div className="lg:col-span-4 space-y-10">
+          {errorState && errorState !== "API_CONFIGURATION_REQUIRED" && (
+            <div className="p-6 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 dark:border-paprika-900/50 rounded-[2rem] space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-paprika-600">
+                  <AlertTriangle size={20} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Synthesis Error</span>
+                </div>
+                <button onClick={() => setErrorState(null)} className="text-neutral-400 hover:text-paprika-600">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="text-xs font-medium text-paprika-700 dark:text-paprika-400 leading-relaxed">{errorState}</p>
+            </div>
+          )}
+
           <section className="space-y-6">
             <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em] flex items-center gap-3">
               <Sparkles size={14} className="text-saffron-500" /> Input Matrix
@@ -246,7 +261,7 @@ const Studio: React.FC = () => {
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addCustomIngredient()}
                 placeholder="Manual entry..."
-                className="flex-1 bg-neutral-100 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 px-6 py-4 text-sm font-bold rounded-2xl focus:outline-none focus:border-saffron-500 transition-all text-neutral-900 dark:text-neutral-50"
+                className="flex-1 bg-neutral-100 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 px-6 py-4 text-sm font-bold rounded-2xl focus:outline-none focus:border-saffron-500 transition-all text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-300"
               />
               <button onClick={() => addCustomIngredient()} className="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-saffron-500 rounded-2xl hover:bg-saffron-50 transition-colors">
                 <Plus size={20} />
@@ -281,17 +296,21 @@ const Studio: React.FC = () => {
           </section>
 
           <div className="space-y-4">
-            {(validationError || errorState) && (
+            {validationError && (
               <div className="p-4 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 dark:border-paprika-900/50 rounded-2xl flex items-center gap-3 text-paprika-600 animate-fade-in">
                 <AlertTriangle size={18} />
-                <p className="text-[10px] font-black uppercase tracking-wider">{validationError || errorState}</p>
+                <p className="text-[10px] font-black uppercase tracking-wider">{validationError}</p>
               </div>
             )}
             <button 
-              disabled={isGenerating}
+              disabled={isGenerating || !validationStatus.isValid}
               onClick={handleGenerate}
               className={`w-full py-6 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 rounded-[2rem] transition-all shadow-2xl ${
-                isGenerating ? 'bg-neutral-900 dark:bg-neutral-700 cursor-not-allowed' : 'bg-saffron-500 hover:bg-saffron-600 shadow-saffron-500/30'
+                isGenerating 
+                  ? 'bg-neutral-900 dark:bg-neutral-700 cursor-not-allowed opacity-100' 
+                  : validationStatus.isValid 
+                    ? 'bg-saffron-500 hover:bg-saffron-600 shadow-saffron-500/30' 
+                    : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed shadow-none'
               }`}
             >
               {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Wand2 size={18} />}
@@ -300,34 +319,45 @@ const Studio: React.FC = () => {
           </div>
         </div>
 
-        {/* Output Display Area */}
-        <div className="lg:col-span-8 h-full">
+        {/* Display Area */}
+        <div className="lg:col-span-8 h-full min-h-[600px]">
           {isGenerating ? (
-            <div className="h-full min-h-[500px] flex flex-col items-center justify-center space-y-10 bg-neutral-100/50 dark:bg-neutral-800/20 rounded-[3rem] border-2 border-dashed border-neutral-200 dark:border-neutral-800">
+            <div className="h-full flex flex-col items-center justify-center space-y-10 bg-white dark:bg-neutral-800/20 rounded-[3rem] border-2 border-dashed border-neutral-200 dark:border-neutral-800 animate-pulse">
               <div className="relative">
-                <div className="w-32 h-32 border-4 border-saffron-100 border-t-saffron-500 rounded-full animate-spin" />
-                <ChefHat className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-saffron-500" size={32} />
+                <div className="w-40 h-40 border-4 border-saffron-100 border-t-saffron-500 rounded-full animate-spin" />
+                <ChefHat className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-saffron-500" size={48} />
               </div>
-              <div className="text-center space-y-4">
-                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500 animate-pulse">Processing Culinary Vectors</p>
-                <p className="text-sm text-neutral-400 font-medium italic">Gemini Pro is curating your personalized recipe...</p>
+              <div className="text-center space-y-6 max-w-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500">Processing Culinary Intelligence</p>
+                <p className="text-base text-neutral-500 dark:text-neutral-400 font-medium italic leading-relaxed">Gemini Pro is curating your personalized recipe JSON and visual blueprint...</p>
               </div>
             </div>
           ) : generatedRecipe ? (
             <div className="space-y-12 animate-fade-in text-left">
-              <div className="relative rounded-[3rem] overflow-hidden shadow-2xl group h-[450px]">
-                <img src={generatedRecipe.imageUrl} className="w-full h-full object-cover" alt={generatedRecipe.title} />
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/90 via-neutral-900/20 to-transparent" />
+              <div className="relative rounded-[3rem] overflow-hidden shadow-2xl group h-[500px] border border-neutral-200 dark:border-neutral-800">
+                {generatedRecipe.imageUrl ? (
+                   <img src={generatedRecipe.imageUrl} className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105" alt={generatedRecipe.title} />
+                ) : (
+                   <div className="w-full h-full bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center">
+                      <Loader2 size={40} className="text-saffron-500 animate-spin" />
+                   </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/95 via-neutral-900/30 to-transparent" />
                 <div className="absolute bottom-12 left-12 right-12 flex justify-between items-end">
-                   <div className="space-y-4">
+                   <div className="space-y-4 max-w-2xl">
                       <div className="flex gap-3">
                         <span className="px-3 py-1 bg-saffron-500 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">{generatedRecipe.cuisine}</span>
-                        <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg">{generatedRecipe.dietaryNeeds[0] || 'Standard'}</span>
+                        <span className="px-3 py-1 bg-white/10 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg border border-white/20">
+                          {generatedRecipe.dietaryNeeds[0] || 'Standard'}
+                        </span>
                       </div>
-                      <h3 className="text-5xl font-serif font-black text-white italic tracking-tight">{generatedRecipe.title}</h3>
+                      <h3 className="text-5xl md:text-6xl font-serif font-black text-white italic tracking-tight leading-tight">{generatedRecipe.title}</h3>
                    </div>
-                   <button onClick={() => { saveRecipe(generatedRecipe); setGeneratedRecipe(null); }} className="p-6 bg-white text-saffron-500 rounded-full hover:scale-110 transition-transform shadow-xl">
-                     <Save size={28} />
+                   <button 
+                     onClick={() => { saveRecipe(generatedRecipe); setGeneratedRecipe(null); }} 
+                     className="p-8 bg-white text-saffron-500 rounded-full hover:scale-110 transition-transform shadow-2xl shadow-black/20"
+                   >
+                     <Save size={32} />
                    </button>
                 </div>
               </div>
@@ -340,68 +370,70 @@ const Studio: React.FC = () => {
                   </div>
                   <ul className="space-y-4">
                     {generatedRecipe.ingredients.map((ing, i) => (
-                      <li key={i} className="flex items-center justify-between p-4 bg-white dark:bg-neutral-800/40 rounded-2xl border border-neutral-100 dark:border-neutral-800 shadow-sm">
-                        <span className="text-sm font-bold text-neutral-900 dark:text-neutral-50">{ing.name}</span>
+                      <li key={i} className="flex items-center justify-between p-5 bg-white dark:bg-neutral-800/40 rounded-2xl border border-neutral-100 dark:border-neutral-800 shadow-sm">
+                        <span className="text-sm font-bold text-neutral-900 dark:text-neutral-50 capitalize">{ing.name}</span>
                         <span className="text-[10px] font-black text-saffron-500 uppercase tracking-widest">{ing.amount} {ing.unit}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
+                
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
                     <div className="w-1.5 h-6 bg-saffron-500 rounded-full" />
                     <h4 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em]">Execution Protocol</h4>
                   </div>
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     {generatedRecipe.instructions.map((step, i) => (
-                      <div key={i} className="flex gap-6">
-                        <span className="text-2xl font-serif font-black text-saffron-500 italic leading-none">{i + 1}</span>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400 font-medium leading-relaxed">{step}</p>
+                      <div key={i} className="flex gap-8 group">
+                        <span className="text-3xl font-serif font-black text-saffron-500 italic leading-none group-hover:scale-110 transition-transform">{i + 1}</span>
+                        <p className="text-base text-neutral-500 dark:text-neutral-400 font-medium leading-relaxed">{step}</p>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
+              
               <ChefChat recipe={generatedRecipe} />
             </div>
           ) : (
-            <div className="h-full min-h-[500px] flex flex-col items-center justify-center p-16 text-center space-y-12 bg-neutral-100/30 dark:bg-neutral-800/10 rounded-[3rem] border border-dashed border-neutral-200 dark:border-neutral-800/50">
-              <div className="w-20 h-20 bg-neutral-50 dark:bg-neutral-800/40 rounded-3xl flex items-center justify-center text-neutral-200 dark:text-neutral-700">
-                <Utensils size={32} />
+            <div className="h-full flex flex-col items-center justify-center p-16 text-center space-y-12 bg-neutral-50 dark:bg-neutral-800/10 rounded-[4rem] border border-dashed border-neutral-200 dark:border-neutral-800/50">
+              <div className={`w-28 h-28 rounded-3xl flex items-center justify-center transition-all duration-700 ${validationStatus.isValid ? 'bg-saffron-100 text-saffron-500 shadow-2xl shadow-saffron-500/10 scale-110' : 'bg-neutral-100 dark:bg-neutral-800/40 text-neutral-200 dark:text-neutral-700'}`}>
+                <Utensils size={48} className={validationStatus.isValid ? 'animate-bounce-slow' : ''} />
               </div>
               
               <div className="max-w-md space-y-10">
-                <div className="space-y-3">
-                  <h3 className="text-4xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">
-                    {validationStatus.isValid ? 'Ready for Synthesis' : 'Synthesis Readiness'}
+                <div className="space-y-4">
+                  <h3 className="text-4xl md:text-5xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">
+                    {validationStatus.isValid ? 'Engine Ready' : 'Synthesis Setup'}
                   </h3>
-                  <p className="text-sm text-neutral-400 font-medium leading-relaxed">
+                  <p className="text-base text-neutral-400 font-medium leading-relaxed">
                     {validationStatus.isValid 
-                      ? 'All required culinay parameters are loaded. Click the Run Synthesis button to begin.' 
+                      ? 'Global culinary vectors have been established. Synthesis engine is primed for execution.' 
                       : 'Load at least two components (including a main veg/protein/grain) to initialize synthesis.'}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 text-left">
-                  <div className={`p-5 rounded-2xl flex items-center gap-4 border transition-all ${validationStatus.isValid ? 'bg-saffron-500 text-white border-saffron-600 shadow-lg shadow-saffron-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-100'}`}>
-                    {validationStatus.isValid ? <CheckCircle2 /> : <Circle className="text-neutral-200" />}
+                  <div className={`p-6 rounded-3xl flex items-center gap-6 border transition-all duration-500 ${validationStatus.isValid ? 'bg-saffron-500 text-white border-saffron-600 shadow-2xl shadow-saffron-500/30 -translate-y-1' : 'bg-white dark:bg-neutral-800 border-neutral-100 dark:border-neutral-800'}`}>
+                    {validationStatus.isValid ? <CheckCircle2 size={24} /> : <Circle className="text-neutral-200" size={24} />}
                     <div className="flex-1">
                       <p className={`text-xs font-black uppercase tracking-widest ${validationStatus.isValid ? 'text-white' : 'text-neutral-400'}`}>
-                        {validationStatus.isValid ? 'Parameters Validated' : 'Awaiting Parameters'}
+                        {validationStatus.isValid ? 'Protocol Validated' : 'Awaiting Parameters'}
                       </p>
-                      <p className={`text-[11px] ${validationStatus.isValid ? 'text-white/80' : 'text-neutral-400'}`}>
-                        Core ingredients detected and cross-referenced with preferences.
+                      <p className={`text-[11px] mt-1 ${validationStatus.isValid ? 'text-white/80' : 'text-neutral-400'}`}>
+                        Ingredients and preferences are synced with the intelligence layer.
                       </p>
                     </div>
-                    {validationStatus.isValid && <ArrowRight size={20} className="animate-bounce-x" />}
+                    {validationStatus.isValid && <ArrowRight size={20} className="animate-pulse" />}
                   </div>
                 </div>
 
                 {!validationStatus.isValid && ingredients.length > 0 && (
-                  <div className="p-4 bg-paprika-50 dark:bg-paprika-900/10 rounded-xl flex items-center gap-3 text-paprika-600 border border-paprika-100 text-left">
-                    <Info size={18} className="flex-shrink-0" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      The intelligence layer requires a core protein, vegetable, or grain to build a balanced meal.
+                  <div className="p-5 bg-paprika-50 dark:bg-paprika-900/10 rounded-2xl flex items-center gap-4 text-paprika-600 border border-paprika-100 dark:border-paprika-900/50 text-left animate-fade-in">
+                    <Info size={20} className="flex-shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                      Error: Input matrix lacks a core protein, vegetable, or grain component required for Synthesis.
                     </span>
                   </div>
                 )}

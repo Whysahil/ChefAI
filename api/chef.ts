@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// 1. Expanded "Core" ingredients for more flexible validation logic
+// Expanded "Core" ingredients for robust validation
 const CORE_INGREDIENTS = [
   'chicken', 'eggs', 'fish', 'shrimp', 'mutton', 'pork', 'beef', 'lamb',
   'paneer', 'tofu', 'chana', 'dal', 'kidney beans', 'lentils', 'soya',
@@ -37,6 +37,15 @@ const recipeSchema = {
       type: Type.ARRAY,
       items: { type: Type.STRING }
     },
+    tips: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    },
+    substitutions: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    },
+    servingSuggestions: { type: Type.STRING },
     nutrition: {
       type: Type.OBJECT,
       properties: {
@@ -52,7 +61,7 @@ const recipeSchema = {
   required: [
     "title", "description", "mealType", "prepTime", "cookTime", 
     "ingredients", "instructions", "nutrition", "imagePrompt", 
-    "servings", "difficulty"
+    "servings", "difficulty", "tips", "substitutions", "servingSuggestions"
   ]
 };
 
@@ -97,26 +106,12 @@ export default async function handler(req: any, res: any) {
   try {
     switch (action) {
       case 'generate':
-        const userIngredients = payload.ingredients || [];
-        const normalizedItems = userIngredients.map((i: string) => i.toLowerCase().trim());
-        const hasCore = normalizedItems.some((ing: string) => 
-          CORE_INGREDIENTS.includes(ing)
-        );
-
-        if (userIngredients.length === 0) {
-          return res.status(400).json({ status: "invalid_input", message: "Please add at least one ingredient." });
-        }
-
-        if (!hasCore && userIngredients.length < 2) {
-          return res.status(400).json({ status: "invalid_input", message: "Synthesis requires a main component (Veg/Protein/Grain)." });
-        }
-
         const genResult = await executeWithFailover(async (ai) => {
           return await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: [{ 
               role: 'user', 
-              parts: [{ text: `Act as a Michelin star chef. Create a recipe. JSON MUST follow schema strictly. ${payload.prompt}` }] 
+              parts: [{ text: `Act as a Michelin star chef with deep knowledge of global and regional cuisines. Create a unique recipe based on the following context. Ensure the JSON strictly follows the schema provided. PROMPT: ${payload.prompt}` }] 
             }],
             config: {
               responseMimeType: "application/json",
@@ -158,6 +153,7 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ status: "error", error: 'INVALID_ACTION' });
     }
   } catch (error: any) {
+    console.error("API Layer Error:", error);
     return res.status(500).json({ 
       status: "error", 
       error: 'SYNTHESIS_FAILED', 
