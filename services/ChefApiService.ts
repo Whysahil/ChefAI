@@ -14,7 +14,7 @@ const getHeaders = () => {
 async function handleResponse(res: Response) {
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.message || 'Network request failed');
+    throw new Error(data.message || 'Culinary synthesis protocol failure.');
   }
   return data;
 }
@@ -47,9 +47,22 @@ export const ChefApiService = {
     const res = await fetch(`${BASE_URL}/recipes`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(params)
+      body: JSON.stringify({ ...params, action: 'generate' })
     });
-    return handleResponse(res);
+    const data = await handleResponse(res);
+    
+    // Ensure the client-side ID and creation time are assigned
+    if (data.status === 'success' && data.recipe) {
+      return {
+        ...data,
+        recipe: {
+          ...data.recipe,
+          id: data.recipe.id || Math.random().toString(36).substring(2, 11),
+          createdAt: Date.now()
+        }
+      };
+    }
+    return data;
   },
 
   async generateImage(prompt: string) {

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wand2, ChefHat, Sparkles, Loader2, ChevronDown, ChevronUp, Save, Utensils, AlertTriangle, X, CheckCircle2 } from 'lucide-react';
+import { Plus, Wand2, ChefHat, Sparkles, Loader2, ChevronDown, ChevronUp, Save, Utensils, AlertTriangle, X, CheckCircle2, Info } from 'lucide-react';
 import { ChefApiService } from '../services/ChefApiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -24,10 +24,20 @@ const Studio: React.FC = () => {
     mealType: 'Dinner'
   });
 
+  // Extract core ingredients from specified categories for validation
+  const coreIngredientsList = useMemo(() => {
+    const coreCategories = ['Vegetables', 'Proteins', 'Grains & Staples'];
+    return INGREDIENT_CATEGORIES
+      .filter(cat => coreCategories.includes(cat.name))
+      .flatMap(cat => cat.items);
+  }, []);
+
   const validationStatus = useMemo(() => {
     const hasAny = ingredients.length > 0;
-    return { hasAny, isValid: hasAny };
-  }, [ingredients]);
+    // Check if at least one selected ingredient is from the core categories
+    const hasCore = ingredients.some(ing => coreIngredientsList.includes(ing));
+    return { hasAny, hasCore };
+  }, [ingredients, coreIngredientsList]);
 
   const addCustomIngredient = () => {
     const val = inputValue.trim().toLowerCase();
@@ -45,8 +55,15 @@ const Studio: React.FC = () => {
     setErrorState(null);
     setIsSaved(false);
 
+    // Initial check: must have at least something
     if (ingredients.length === 0) {
-      setValidationError("Input matrix is empty. Please select ingredients.");
+      setValidationError("Selection Matrix Empty: Please add at least one ingredient to begin synthesis.");
+      return;
+    }
+
+    // Core validation: must have a base ingredient for a valid recipe
+    if (!validationStatus.hasCore) {
+      setValidationError("Core Requirement Missing: A master recipe needs a solid foundation. Please include at least one Vegetable, Protein, or Grain.");
       return;
     }
 
@@ -80,7 +97,7 @@ const Studio: React.FC = () => {
         }
       }
     } catch (err: any) { 
-      setErrorState(err.message || "Synthesis interrupted.");
+      setErrorState(err.message || "Synthesis interrupted. Our culinary engines encountered an unexpected variable.");
     } finally { 
       setIsGenerating(false); 
     }
@@ -113,9 +130,15 @@ const Studio: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-4 space-y-10">
           <section className="space-y-6">
-            <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em] flex items-center gap-3">
-              <Sparkles size={14} className="text-saffron-500" /> Input Matrix
-            </h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em] flex items-center gap-3">
+                <Sparkles size={14} className="text-saffron-500" /> Input Matrix
+              </h3>
+              <div className={`flex items-center gap-2 text-[9px] font-black uppercase tracking-widest ${validationStatus.hasCore ? 'text-green-500' : 'text-neutral-400'}`}>
+                {validationStatus.hasCore ? <CheckCircle2 size={12} /> : <Info size={12} />}
+                {validationStatus.hasCore ? 'Core Base Met' : 'Add a Base'}
+              </div>
+            </div>
             
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {INGREDIENT_CATEGORIES.map(cat => (
@@ -124,7 +147,12 @@ const Studio: React.FC = () => {
                     onClick={() => setExpandedCategory(expandedCategory === cat.name ? null : cat.name)}
                     className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
                   >
-                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-50 uppercase tracking-widest">{cat.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-neutral-900 dark:text-neutral-50 uppercase tracking-widest">{cat.name}</span>
+                      {['Vegetables', 'Proteins', 'Grains & Staples'].includes(cat.name) && (
+                        <div className="w-1.5 h-1.5 bg-saffron-500 rounded-full" title="Core Category" />
+                      )}
+                    </div>
                     {expandedCategory === cat.name ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   
@@ -191,17 +219,20 @@ const Studio: React.FC = () => {
 
           <div className="space-y-4">
             {(validationError || errorState) && (
-              <div className="p-4 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 rounded-2xl flex items-center gap-3 text-paprika-600 animate-fade-in">
-                <AlertTriangle size={18} />
-                <p className="text-[10px] font-black uppercase tracking-wider">{validationError || errorState}</p>
-                <button onClick={() => {setErrorState(null); setValidationError(null)}} className="ml-auto"><X size={14}/></button>
+              <div className="p-5 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 dark:border-paprika-900/40 rounded-3xl flex gap-4 text-paprika-600 animate-fade-in">
+                <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-1">
+                  <p className="text-[11px] font-black uppercase tracking-wider">Protocol Alert</p>
+                  <p className="text-xs font-medium opacity-90">{validationError || errorState}</p>
+                </div>
+                <button onClick={() => {setErrorState(null); setValidationError(null)}} className="flex-shrink-0 h-fit"><X size={16}/></button>
               </div>
             )}
             <button 
-              disabled={isGenerating || !validationStatus.isValid}
+              disabled={isGenerating || ingredients.length === 0}
               onClick={handleGenerate}
               className={`w-full py-6 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 rounded-[2rem] transition-all shadow-2xl ${
-                isGenerating ? 'bg-neutral-900 cursor-not-allowed' : 'bg-saffron-500 hover:bg-saffron-600 shadow-saffron-500/20'
+                isGenerating ? 'bg-neutral-900 cursor-not-allowed' : (ingredients.length === 0 ? 'bg-neutral-300 dark:bg-neutral-800 cursor-not-allowed' : 'bg-saffron-500 hover:bg-saffron-600 shadow-saffron-500/20')
               }`}
             >
               {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Wand2 size={18} />}
@@ -296,9 +327,14 @@ const Studio: React.FC = () => {
                 <p className="text-base text-neutral-400 font-medium">Configure your ingredients and preferences to generate a Michelin-star protocol.</p>
               </div>
               <div className="flex gap-3">
-                 <div className={`px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 border ${validationStatus.isValid ? 'bg-saffron-50 text-saffron-600 border-saffron-100' : 'bg-neutral-100 text-neutral-400 border-neutral-200'}`}>
-                    {validationStatus.isValid ? <CheckCircle2 size={12}/> : <span className="w-2 h-2 rounded-full bg-neutral-300"/>} Ingredients Loaded
+                 <div className={`px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 border ${ingredients.length > 0 ? 'bg-saffron-50 text-saffron-600 border-saffron-100' : 'bg-neutral-100 text-neutral-400 border-neutral-200'}`}>
+                    {ingredients.length > 0 ? <CheckCircle2 size={12}/> : <span className="w-2 h-2 rounded-full bg-neutral-300"/>} {ingredients.length} Ingredients Loaded
                  </div>
+                 {ingredients.length > 0 && !validationStatus.hasCore && (
+                   <div className="px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 border bg-paprika-50 text-paprika-600 border-paprika-100 animate-pulse">
+                      <AlertTriangle size={12}/> Core Base Needed
+                   </div>
+                 )}
               </div>
             </div>
           )}

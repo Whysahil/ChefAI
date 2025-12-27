@@ -1,6 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
 
-const recipeSchema = {
+import { GoogleGenAI, Type } from "@google/genai";
+import { validateAndNormalizeRecipe } from "../../lib/validations";
+
+const nativeRecipeSchema = {
   type: Type.OBJECT,
   properties: {
     title: { type: Type.STRING },
@@ -49,13 +51,9 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ status: "error", message: "Method not allowed" });
 
   const { ingredients, diet, cuisine, action, prompt } = req.body;
-  const envKey = process.env.API_KEY;
-  if (!envKey) {
-    return res.status(500).json({ status: "error", message: "API Configuration Missing" });
-  }
-  const apiKey: string = envKey;
-
-  const ai = new GoogleGenAI({ apiKey });
+  
+  // Use process.env.API_KEY directly as required by guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   try {
     if (action === 'image') {
@@ -89,7 +87,7 @@ export default async function handler(req: any, res: any) {
       contents: `Create a professional recipe using: ${ingredientsList}. Style: ${cuisineStyle}. Diet: ${dietPreference}.`,
       config: {
         responseMimeType: "application/json",
-        responseSchema: recipeSchema,
+        responseSchema: nativeRecipeSchema,
         thinkingConfig: { thinkingBudget: 16000 }
       }
     });
@@ -99,12 +97,19 @@ export default async function handler(req: any, res: any) {
       throw new Error("Synthesis failed: The model returned an empty response.");
     }
 
+    const rawRecipe = JSON.parse(responseText);
+    const validatedRecipe = validateAndNormalizeRecipe(rawRecipe);
+
     return res.status(200).json({
       status: "success",
-      message: "Recipe generated successfully",
-      recipe: JSON.parse(responseText)
+      message: "Recipe generated and validated successfully",
+      recipe: validatedRecipe
     });
   } catch (error: any) {
-    return res.status(500).json({ status: "error", message: error.message });
+    console.error("API Recipe Error:", error);
+    return res.status(500).json({ 
+      status: "error", 
+      message: error.message || "An unexpected error occurred during recipe synthesis." 
+    });
   }
 }

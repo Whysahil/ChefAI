@@ -1,6 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
 
-const recipeSchema = {
+import { GoogleGenAI, Type } from "@google/genai";
+import { validateAndNormalizeRecipe } from "../lib/validations";
+
+const nativeRecipeSchema = {
   type: Type.OBJECT,
   properties: {
     title: { type: Type.STRING },
@@ -60,47 +62,37 @@ export default async function handler(req: any, res: any) {
 
   const { action, payload } = req.body;
   
-  // Rule: Environment variable must be obtained exclusively from process.env.API_KEY
-  // Fix TS2322: Guard to ensure apiKey is a string
-  const envKey = process.env.API_KEY;
-  if (!envKey) {
-    return res.status(500).json({ 
-      status: "error", 
-      error: 'API_KEY_MISSING', 
-      message: "The primary API key is not configured." 
-    });
-  }
-  const apiKey: string = envKey;
+  // Use process.env.API_KEY directly as required by guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   if (action === 'health') {
     return res.status(200).json({ status: 'healthy' });
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-
   try {
     switch (action) {
       case 'generate': {
         const promptText = (payload && typeof payload.prompt === 'string') ? payload.prompt : 'Create a recipe.';
+        // Simplified contents for text-only prompt
         const genResult = await ai.models.generateContent({
           model: 'gemini-3-pro-preview',
-          contents: [{ 
-            role: 'user', 
-            parts: [{ text: `Act as a Michelin star chef. Create a unique recipe. Output ONLY valid JSON matching the schema. CONTEXT: ${promptText}` }] 
-          }],
+          contents: `Act as a Michelin star chef. Create a unique recipe. Output ONLY valid JSON matching the schema. CONTEXT: ${promptText}`,
           config: {
             responseMimeType: "application/json",
-            responseSchema: recipeSchema,
+            responseSchema: nativeRecipeSchema,
             thinkingConfig: { thinkingBudget: 16000 }
           },
         });
         
-        // Fix TS2322: Narrow string | undefined to string
         const text: string = genResult.text ?? "";
         if (!text) {
           throw new Error("The synthesis engine returned an empty text response.");
         }
-        return res.status(200).json({ status: "success", text });
+
+        const rawJson = JSON.parse(text);
+        const validated = validateAndNormalizeRecipe(rawJson);
+
+        return res.status(200).json({ status: "success", text: JSON.stringify(validated) });
       }
 
       case 'analyze': {
@@ -108,14 +100,15 @@ export default async function handler(req: any, res: any) {
         if (!imagePayload || typeof imagePayload !== 'string') {
           return res.status(400).json({ status: "error", message: "Image data is required." });
         }
+        // Correct multimodal content structure per guidelines
         const visionResult = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
-          contents: [{
+          contents: {
             parts: [
               { text: "Identify all culinary ingredients in this image. List them clearly, separated by commas." },
               { inlineData: { mimeType: "image/jpeg", data: imagePayload } }
             ]
-          }]
+          }
         });
         const text: string = visionResult.text ?? "";
         if (!text) {
@@ -133,7 +126,6 @@ export default async function handler(req: any, res: any) {
         });
         
         let base64Data: string = '';
-        // Fix TS18048 & TS2532: Safe checks for candidates and nested parts
         const candidates = imgResult.candidates;
         if (candidates && candidates.length > 0) {
           const content = candidates[0].content;
@@ -153,9 +145,10 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ status: "error", error: 'INVALID_ACTION' });
     }
   } catch (error: any) {
+    console.error("Chef API Error:", error);
     return res.status(500).json({ 
       status: "error", 
-      message: error.message || "Synthesis error." 
+      message: error.message || "Synthesis error during Chef AI operation." 
     });
   }
 }
