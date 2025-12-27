@@ -1,20 +1,16 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Check, AlertCircle, Terminal, Heart, Info, Utensils, RefreshCw, Key, Save, Circle, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Check, AlertCircle, Terminal, Heart, Info, Utensils, RefreshCw, Key, Save, Circle, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { generateRecipe, generateRecipeImage, checkServerHealth } from '../services/geminiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { CUISINES, SKILL_LEVELS, INGREDIENT_CATEGORIES, DIETS } from '../constants';
 import ChefChat from '../components/ChefChat';
 
-// Fix: Simplified global window augmentation to resolve identical modifiers error.
-// Removed the redundant 'var aistudio' and separate interface to avoid conflict.
+// Fix: Use the predefined AIStudio type and align with expected global window property modifiers
 declare global {
   interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
+    aistudio?: AIStudio;
   }
 }
 
@@ -37,18 +33,19 @@ const Studio: React.FC = () => {
   });
 
   const validationStatus = useMemo(() => {
+    // These categories contain the "main" ingredients the API layer requires
     const coreCategories = ['Vegetables', 'Proteins', 'Grains & Staples'];
     const coreItems = INGREDIENT_CATEGORIES
       .filter(cat => coreCategories.includes(cat.name))
       .flatMap(cat => cat.items);
     
-    const hasCore = ingredients.some(ing => coreItems.includes(ing) || !coreItems.includes(ing));
+    const hasCore = ingredients.some(ing => coreItems.includes(ing.toLowerCase()));
     const hasAny = ingredients.length > 0;
     
     return {
       hasCore,
       hasAny,
-      isValid: hasAny && (hasCore || ingredients.length > 2)
+      isValid: hasAny && (hasCore || ingredients.length >= 2)
     };
   }, [ingredients]);
 
@@ -82,14 +79,14 @@ const Studio: React.FC = () => {
       await window.aistudio.openSelectKey();
       setErrorState(null);
       setHealthStatus('healthy');
-      // Per instructions, assume key selection successful after trigger to avoid race conditions
       validateEngine();
     }
   };
 
   const addCustomIngredient = () => {
-    if (inputValue.trim() && !ingredients.includes(inputValue.trim().toLowerCase())) {
-      setIngredients(prev => [...prev, inputValue.trim().toLowerCase()]);
+    const val = inputValue.trim().toLowerCase();
+    if (val && !ingredients.includes(val)) {
+      setIngredients(prev => [...prev, val]);
       setInputValue('');
       setValidationError(null);
       return true;
@@ -99,46 +96,53 @@ const Studio: React.FC = () => {
 
   const handleGenerate = async () => {
     setValidationError(null);
-    let currentIngredients = [...ingredients];
+    setErrorState(null);
+
+    // 1. Commit any pending manual input
+    let finalIngredients = [...ingredients];
     if (inputValue.trim()) {
       const added = inputValue.trim().toLowerCase();
-      if (!currentIngredients.includes(added)) {
-        currentIngredients.push(added);
-        setIngredients(currentIngredients);
+      if (!finalIngredients.includes(added)) {
+        finalIngredients.push(added);
+        setIngredients(finalIngredients);
         setInputValue('');
       }
     }
 
-    if (currentIngredients.length === 0) {
-      setValidationError("Input matrix is empty. Please add items.");
+    // 2. Local Validation
+    if (finalIngredients.length === 0) {
+      setValidationError("Input matrix is empty. Please add ingredients.");
       return;
     }
 
+    if (!validationStatus.hasCore && finalIngredients.length < 2) {
+      setValidationError("Synthesis requires a protein, vegetable, or grain.");
+      return;
+    }
+
+    // 3. Trigger Synthesis
     setIsGenerating(true);
     setGeneratedRecipe(null);
-    setErrorState(null);
     
     try {
       const recipe = await generateRecipe({ 
-        ingredients: currentIngredients, 
+        ingredients: finalIngredients, 
         diet: prefs.diet,
         cuisine: prefs.cuisine,
         mealType: prefs.mealType,
         skill: prefs.skill 
       });
+      
       const imageUrl = await generateRecipeImage(recipe.imagePrompt);
       setGeneratedRecipe({ ...recipe, imageUrl });
     } catch (err: any) { 
       console.error("Synthesis Failed:", err);
-      // Handle the case where the API key is invalid by prompting the user to select again
-      if (err.status === "API_KEY_INVALID" || (err.message && err.message.includes("Requested entity was not found"))) {
+      if (err.status === "API_KEY_INVALID") {
         setErrorState("API_CONFIGURATION_REQUIRED");
       } else if (err.status === "invalid_input") {
         setValidationError(err.message);
-      } else if (err.status === "error") {
-        setErrorState(err.error);
       } else {
-        setErrorState("SYNTHESIS_INTERRUPTED");
+        setErrorState(err.message || "Synthesis Interrupted");
       }
     } finally { 
       setIsGenerating(false); 
@@ -159,7 +163,7 @@ const Studio: React.FC = () => {
     );
   }
 
-  if (errorState === "API_CONFIGURATION_REQUIRED" || errorState === "API_KEY_MISSING") {
+  if (errorState === "API_CONFIGURATION_REQUIRED") {
     return (
       <div className="min-h-[600px] flex items-center justify-center p-10 animate-fade-in text-left">
         <div className="max-w-md w-full text-center space-y-10">
@@ -168,7 +172,7 @@ const Studio: React.FC = () => {
           </div>
           <div className="space-y-4 text-center">
             <h2 className="text-4xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic leading-tight">Engine Offline</h2>
-            <p className="text-neutral-400 font-medium">REST layer protocol requires a valid API key. Keys are handled securely on the server.</p>
+            <p className="text-neutral-400 font-medium">REST layer requires a valid API key. Keys are handled securely on the server.</p>
           </div>
           <button onClick={handleOpenKeySelector} className="w-full py-6 bg-saffron-500 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 rounded-[2rem] hover:bg-saffron-600 transition-all shadow-2xl shadow-saffron-500/20">
             Select API Key <Key size={18} />
@@ -190,6 +194,7 @@ const Studio: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        {/* Sidebar Inputs */}
         <div className="lg:col-span-4 space-y-10">
           <section className="space-y-6">
             <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em] flex items-center gap-3">
@@ -249,7 +254,7 @@ const Studio: React.FC = () => {
             <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em]">Configuration</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Cuisine Focus</label>
+                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Cuisine</label>
                 <select 
                   value={prefs.cuisine}
                   onChange={e => setPrefs({...prefs, cuisine: e.target.value})}
@@ -259,7 +264,7 @@ const Studio: React.FC = () => {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Dietary Logic</label>
+                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Diet</label>
                 <select 
                   value={prefs.diet}
                   onChange={e => setPrefs({...prefs, diet: e.target.value})}
@@ -272,10 +277,10 @@ const Studio: React.FC = () => {
           </section>
 
           <div className="space-y-4">
-            {validationError && (
+            {(validationError || errorState) && (
               <div className="p-4 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 dark:border-paprika-900/50 rounded-2xl flex items-center gap-3 text-paprika-600 animate-fade-in">
                 <AlertTriangle size={18} />
-                <p className="text-[10px] font-black uppercase tracking-wider">{validationError}</p>
+                <p className="text-[10px] font-black uppercase tracking-wider">{validationError || errorState}</p>
               </div>
             )}
             <button 
@@ -291,7 +296,8 @@ const Studio: React.FC = () => {
           </div>
         </div>
 
-        <div className="lg:col-span-8">
+        {/* Output Display Area */}
+        <div className="lg:col-span-8 h-full">
           {isGenerating ? (
             <div className="h-full min-h-[500px] flex flex-col items-center justify-center space-y-10 bg-neutral-100/50 dark:bg-neutral-800/20 rounded-[3rem] border-2 border-dashed border-neutral-200 dark:border-neutral-800">
               <div className="relative">
@@ -299,8 +305,8 @@ const Studio: React.FC = () => {
                 <ChefHat className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-saffron-500" size={32} />
               </div>
               <div className="text-center space-y-4">
-                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500 animate-pulse">REST Layer Processing</p>
-                <p className="text-sm text-neutral-400 font-medium italic">Gemini Pro is curating your personalized recipe JSON...</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500 animate-pulse">Processing Culinary Vectors</p>
+                <p className="text-sm text-neutral-400 font-medium italic">Gemini Pro is curating your personalized recipe...</p>
               </div>
             </div>
           ) : generatedRecipe ? (
@@ -362,24 +368,37 @@ const Studio: React.FC = () => {
               
               <div className="max-w-md space-y-10">
                 <div className="space-y-3">
-                  <h3 className="text-4xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">Synthesis Readiness</h3>
-                  <p className="text-sm text-neutral-400 font-medium">Follow the REST-validated checklist to initialize the AI engine.</p>
+                  <h3 className="text-4xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">
+                    {validationStatus.isValid ? 'Ready for Synthesis' : 'Synthesis Readiness'}
+                  </h3>
+                  <p className="text-sm text-neutral-400 font-medium leading-relaxed">
+                    {validationStatus.isValid 
+                      ? 'All required culinay parameters are loaded. Click the Run Synthesis button to begin.' 
+                      : 'Load at least two components (including a main veg/protein/grain) to initialize synthesis.'}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 text-left">
-                  <div className={`p-5 rounded-2xl flex items-center gap-4 border transition-all ${validationStatus.isValid ? 'bg-saffron-50/50 dark:bg-saffron-900/10 border-saffron-200' : 'bg-white dark:bg-neutral-800 border-neutral-100'}`}>
-                    {validationStatus.isValid ? <CheckCircle2 className="text-saffron-500" /> : <Circle className="text-neutral-200" />}
+                  <div className={`p-5 rounded-2xl flex items-center gap-4 border transition-all ${validationStatus.isValid ? 'bg-saffron-500 text-white border-saffron-600 shadow-lg shadow-saffron-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-100'}`}>
+                    {validationStatus.isValid ? <CheckCircle2 /> : <Circle className="text-neutral-200" />}
                     <div className="flex-1">
-                      <p className={`text-xs font-black uppercase tracking-widest ${validationStatus.isValid ? 'text-saffron-600' : 'text-neutral-400'}`}>REST Protocol Passed</p>
-                      <p className="text-[11px] text-neutral-400">Main ingredients detected. Synthesis permitted.</p>
+                      <p className={`text-xs font-black uppercase tracking-widest ${validationStatus.isValid ? 'text-white' : 'text-neutral-400'}`}>
+                        {validationStatus.isValid ? 'Parameters Validated' : 'Awaiting Parameters'}
+                      </p>
+                      <p className={`text-[11px] ${validationStatus.isValid ? 'text-white/80' : 'text-neutral-400'}`}>
+                        Core ingredients detected and cross-referenced with preferences.
+                      </p>
                     </div>
+                    {validationStatus.isValid && <ArrowRight size={20} className="animate-bounce-x" />}
                   </div>
                 </div>
 
                 {!validationStatus.isValid && ingredients.length > 0 && (
-                  <div className="p-4 bg-paprika-50 dark:bg-paprika-900/10 rounded-xl flex items-center gap-3 text-paprika-600 border border-paprika-100">
-                    <Info size={16} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-left">The API layer requires at least one protein, vegetable, or grain to prevent synthesis failure.</span>
+                  <div className="p-4 bg-paprika-50 dark:bg-paprika-900/10 rounded-xl flex items-center gap-3 text-paprika-600 border border-paprika-100 text-left">
+                    <Info size={18} className="flex-shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      The intelligence layer requires a core protein, vegetable, or grain to build a balanced meal.
+                    </span>
                   </div>
                 )}
               </div>

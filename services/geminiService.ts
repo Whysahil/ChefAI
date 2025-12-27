@@ -10,7 +10,7 @@ async function callChefApi(action: string, payload: any = {}) {
 
   const data = await response.json();
   if (!response.ok) {
-    const error = new Error(data.message || 'API_ERROR') as any;
+    const error = new Error(data.message || 'Culinary API error') as any;
     error.status = data.status || 'error';
     error.error = data.error;
     throw error;
@@ -39,32 +39,35 @@ export async function generateRecipe(params: {
   mealType?: string,
   skill?: string
 }): Promise<Recipe> {
-  const prompt = `Synthesize a professional recipe. 
-    MANDATORY DIETARY CONSTRAINT: ${params.diet || 'None'}. 
-    USER SKILL: ${params.skill} level cook. 
-    Ingredients available: ${params.ingredients?.join(', ') || 'General pantry staples'}. 
-    Preferred Cuisine: ${params.cuisine}. 
-    Meal Context: ${params.mealType}.
-    Ensure the recipe strictly follows the ${params.diet} dietary requirements.`;
+  const prompt = `Synthesize professional recipe. 
+    DIET: ${params.diet || 'Standard'}. 
+    SKILL: ${params.skill}. 
+    INGREDIENTS: ${params.ingredients?.join(', ') || 'Pantry staples'}. 
+    CUISINE: ${params.cuisine}. 
+    MEAL: ${params.mealType}.`;
 
   const result = await callChefApi('generate', { 
     prompt, 
     ingredients: params.ingredients 
   });
   
-  const recipeData = JSON.parse(result.text);
-  
-  return {
-    ...recipeData,
-    id: Math.random().toString(36).substring(2, 11),
-    dietaryNeeds: params.diet ? [params.diet] : [],
-    createdAt: Date.now()
-  };
+  try {
+    const recipeData = JSON.parse(result.text);
+    return {
+      ...recipeData,
+      id: Math.random().toString(36).substring(2, 11),
+      dietaryNeeds: params.diet ? [params.diet] : [],
+      createdAt: Date.now()
+    };
+  } catch (parseError) {
+    console.error("Schema Mismatch:", result.text);
+    throw new Error("AI returned an invalid recipe format. Please try again.");
+  }
 }
 
 export async function generateRecipeImage(prompt: string): Promise<string> {
   try {
-    const result = await callChefApi('image', { prompt: `Professional food photography of ${prompt}.` });
+    const result = await callChefApi('image', { prompt: `Professional food photography, cinematic lighting, ${prompt}` });
     return result.data ? `data:image/png;base64,${result.data}` : 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
   } catch (err) {
     return 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
@@ -74,8 +77,8 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
 export function createChefChat(recipe: Recipe) {
   return {
     sendMessage: async (msg: { message: string }) => {
-      const prompt = `Assistant for "${recipe.title}". User asks: ${msg.message}`;
-      const result = await callChefApi('generate', { prompt });
+      const prompt = `Chat context: Recipe "${recipe.title}". Instructions: ${recipe.instructions.join('. ')}. User query: ${msg.message}. Respond concisely as a master chef.`;
+      const result = await callChefApi('generate', { prompt, ingredients: recipe.ingredients.map(i => i.name) });
       return { text: result.text };
     }
   };
