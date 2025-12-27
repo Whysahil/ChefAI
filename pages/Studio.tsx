@@ -20,7 +20,6 @@ const Studio: React.FC = () => {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(INGREDIENT_CATEGORIES[0].name);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [showCamera, setShowCamera] = useState(false);
   
   const [prefs, setPrefs] = useState({
     diet: 'None',
@@ -44,7 +43,7 @@ const Studio: React.FC = () => {
       setGeneratedRecipe({ ...recipe, imageUrl });
     } catch (err: any) { 
       console.error("Synthesis Error:", err);
-      if (err.message === "API_KEY_MISSING" || err.message?.includes("400") || err.message?.includes("key")) {
+      if (err.message === "API_KEY_MISSING") {
         setErrorState("API_CONFIGURATION_REQUIRED");
       } else {
         setErrorState("SYNTHESIS_INTERRUPTED");
@@ -73,19 +72,19 @@ const Studio: React.FC = () => {
           <div className="space-y-4">
             <h2 className="text-3xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">System Offline.</h2>
             <p className="text-neutral-500 font-medium leading-relaxed">
-              The ChefAI synthesis engine requires a valid <span className="text-saffron-600 font-bold">API_KEY</span>. 
-              Please verify your Vercel Environment Variables or local <code className="bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded text-saffron-500">.env</code> configuration.
+              The ChefAI synthesis engine is missing its server-side <span className="text-saffron-600 font-bold">API_KEY</span>. 
+              Please verify your Vercel Dashboard Environment Variables.
             </p>
           </div>
           <div className="bg-neutral-50 dark:bg-neutral-900 p-4 rounded-2xl text-left border border-neutral-100 dark:border-neutral-700">
              <div className="flex items-center gap-2 mb-2">
                 <Terminal size={14} className="text-neutral-400" />
-                <span className="text-[10px] font-bold text-neutral-400 uppercase">Resolution Protocol</span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">Production Resolution</span>
              </div>
              <p className="text-[11px] text-neutral-500 leading-normal">
-                1. Set <code className="text-saffron-500">API_KEY</code> in Project Settings.<br/>
-                2. Redeploy the application.<br/>
-                3. Ensure the key has Gemini API access.
+                1. Go to Vercel Dashboard > Settings > Environment Variables.<br/>
+                2. Add <code className="text-saffron-500 font-bold">API_KEY</code>.<br/>
+                3. Redeploy your application to activate the key.
              </p>
           </div>
           <button 
@@ -105,13 +104,13 @@ const Studio: React.FC = () => {
       <header className="flex flex-col lg:flex-row gap-8 lg:items-center">
         <div className="flex-1 space-y-6">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-saffron-50 dark:bg-saffron-900/10 text-saffron-600 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-saffron-100/50">
-            <Sparkles size={14} /> Production Node • Stable
+            <Sparkles size={14} /> Secure Server Mode • Active
           </div>
           <h2 className="text-5xl md:text-7xl font-serif font-black tracking-tight text-neutral-900 dark:text-neutral-50 uppercase italic leading-[0.9]">
             Synthesis<br/><span className="text-saffron-500">Laboratory.</span>
           </h2>
           <p className="text-neutral-500 font-medium text-lg md:text-xl max-w-2xl leading-relaxed">
-            Audit your pantry and generate calibrated culinary blueprints using our server-hardened AI synthesis engine.
+            Audit your pantry and generate culinary blueprints via our server-hardened AI synthesis engine.
           </p>
         </div>
       </header>
@@ -186,7 +185,7 @@ const Studio: React.FC = () => {
             <div className="min-h-[500px] flex flex-col items-center justify-center p-12 bg-white dark:bg-neutral-800 rounded-[2.5rem] border border-neutral-200 dark:border-neutral-700 shadow-sm animate-pulse">
                <ChefHat size={40} className="text-saffron-500 animate-bounce mb-6" />
                <h2 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic">Mapping Vectors...</h2>
-               <p className="mt-4 text-neutral-400 font-medium">Communicating with synthesis engine.</p>
+               <p className="mt-4 text-neutral-400 font-medium">Communicating with secure synthesis node.</p>
             </div>
           ) : generatedRecipe ? (
             <div className="space-y-10 animate-slide-up">

@@ -1,118 +1,39 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { Recipe } from "../types";
 
-const recipeSchema = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING },
-    description: { type: Type.STRING },
-    cuisine: { type: Type.STRING },
-    mealType: { type: Type.STRING },
-    prepTime: { type: Type.STRING },
-    cookTime: { type: Type.STRING },
-    servings: { type: Type.NUMBER },
-    difficulty: { type: Type.STRING },
-    ingredients: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          amount: { type: Type.STRING },
-          unit: { type: Type.STRING }
-        },
-        required: ["name", "amount", "unit"]
-      }
-    },
-    instructions: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING }
-    },
-    tips: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING }
-    },
-    nutrition: {
-      type: Type.OBJECT,
-      properties: {
-        calories: { type: Type.NUMBER },
-        protein: { type: Type.STRING },
-        carbs: { type: Type.STRING },
-        fat: { type: Type.STRING }
-      },
-      required: ["calories", "protein", "carbs", "fat"]
-    },
-    servingSuggestions: { type: Type.STRING },
-    substitutions: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING }
-    },
-    imagePrompt: { type: Type.STRING }
-  },
-  required: [
-    "title", "description", "mealType", "prepTime", "cookTime", 
-    "ingredients", "instructions", "nutrition", "imagePrompt", 
-    "servingSuggestions", "servings", "difficulty"
-  ]
-};
-
-/**
- * Robust AI Instance factory.
- * Adheres to @google/genai guidelines while providing runtime validation.
- */
-const getAIInstance = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-    throw new Error("API_KEY_MISSING");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-export async function analyzeIngredients(base64Image: string): Promise<string[]> {
-  try {
-    const ai = getAIInstance();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [
-        {
-          parts: [
-            { text: "Identify the food ingredients in this image. Provide a comma-separated list." },
-            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
-          ]
-        }
-      ],
-      config: { thinkingConfig: { thinkingBudget: 0 } }
-    });
-    
-    const text = response.text;
-    if (!text) return [];
-    return text.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
-  } catch (err: any) {
-    console.error("ChefAI Vision Error:", err);
-    throw err;
-  }
-}
-
-async function attemptRecipeGeneration(modelName: string, prompt: string): Promise<Recipe> {
-  const ai = getAIInstance();
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: recipeSchema,
-      maxOutputTokens: 10000,
-      // Disable thinking for Flash to avoid capacity errors on base keys
-      thinkingConfig: { thinkingBudget: modelName.includes('pro') ? 2000 : 0 }
-    },
+async function callChefApi(action: string, payload: any) {
+  const response = await fetch('/api/chef', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, payload })
   });
 
-  const text = response.text;
-  if (!text) throw new Error("Synthesis failed to produce content.");
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'API_ERROR');
+  }
+  return data;
+}
 
-  const cleanJson = text.replace(/^[^{]*({.*})[^}]*$/s, '$1').trim();
-  const recipeData = JSON.parse(cleanJson);
+export async function analyzeIngredients(base64Image: string): Promise<string[]> {
+  const result = await callChefApi('analyze', { image: base64Image });
+  return result.text ? result.text.split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => s.length > 0) : [];
+}
+
+export async function generateRecipe(params: {
+  ingredients?: string[],
+  diet?: string,
+  cuisine?: string,
+  mealType?: string,
+  skill?: string
+}): Promise<Recipe> {
+  const prompt = `Synthesize a professional recipe for a ${params.skill} level cook. 
+    Ingredients: ${params.ingredients?.join(', ') || 'General pantry staples'}. 
+    Cuisine: ${params.cuisine}. 
+    Diet: ${params.diet}.`;
+
+  const result = await callChefApi('generate', { prompt });
+  const recipeData = JSON.parse(result.text);
   
   return {
     ...recipeData,
@@ -122,52 +43,24 @@ async function attemptRecipeGeneration(modelName: string, prompt: string): Promi
   };
 }
 
-export async function generateRecipe(params: {
-  ingredients?: string[],
-  diet?: string,
-  cuisine?: string,
-  mealType?: string,
-  skill?: string,
-  spiceLevel?: string,
-  cookingPreference?: string
-}): Promise<Recipe> {
-  const prompt = `Synthesize a professional recipe for a ${params.skill} level cook.
-    Ingredients provided: ${params.ingredients?.join(', ') || 'General pantry staples'}.
-    Cuisine target: ${params.cuisine}.
-    Dietary preferences: ${params.diet}.`;
-
-  try {
-    return await attemptRecipeGeneration('gemini-3-flash-preview', prompt);
-  } catch (err: any) {
-    if (err.message === "API_KEY_MISSING") throw err;
-    console.warn("ChefAI: Switching to high-precision reasoning fallback...");
-    return await attemptRecipeGeneration('gemini-3-pro-preview', prompt);
-  }
-}
-
 export async function generateRecipeImage(prompt: string): Promise<string> {
   try {
-    const ai = getAIInstance();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: `Professional gourmet food photography of ${prompt}. Cinematic lighting, macro detail.` }]
-      },
-      config: { imageConfig: { aspectRatio: "16:9" } }
-    });
-
-    const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : '';
+    const result = await callChefApi('image', { prompt: `Professional food photography of ${prompt}.` });
+    return result.data ? `data:image/png;base64,${result.data}` : 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
   } catch (err) {
-    console.warn("ChefAI: Visual synthesis omitted due to key restrictions.");
     return 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
   }
 }
 
+// Note: createChefChat for real-time streaming would require an Edge Function with WebSockets, 
+// for this implementation we will handle simple chat via the same synthesis endpoint if needed.
 export function createChefChat(recipe: Recipe) {
-  const ai = getAIInstance();
-  return ai.chats.create({
-    model: 'gemini-3-flash-preview',
-    config: { systemInstruction: `You are the ChefAI assistant for "${recipe.title}". Provide expert culinary guidance.` }
-  });
+  // Placeholder implementation for chat via API proxy
+  return {
+    sendMessage: async (msg: { message: string }) => {
+      const prompt = `Assistant for "${recipe.title}". User asks: ${msg.message}`;
+      const result = await callChefApi('generate', { prompt }); // Simplified for demo
+      return { text: result.text };
+    }
+  };
 }
