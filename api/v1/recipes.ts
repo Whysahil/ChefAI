@@ -52,7 +52,6 @@ export default async function handler(req: any, res: any) {
 
   const { ingredients, diet, cuisine, action, prompt } = req.body;
   
-  // Use process.env.API_KEY directly as required by guidelines
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   try {
@@ -94,22 +93,32 @@ export default async function handler(req: any, res: any) {
 
     const responseText: string = response.text ?? "";
     if (!responseText) {
-      throw new Error("Synthesis failed: The model returned an empty response.");
+      throw new Error("AI returned empty data stream.");
     }
 
-    const rawRecipe = JSON.parse(responseText);
-    const validatedRecipe = validateAndNormalizeRecipe(rawRecipe);
+    // LAYER 2: Validation & Normalization
+    let validatedRecipe;
+    try {
+      const rawRecipe = JSON.parse(responseText);
+      validatedRecipe = validateAndNormalizeRecipe(rawRecipe);
+    } catch (validationErr: any) {
+      // Reject invalid AI output with 422
+      return res.status(422).json({
+        status: "ai_error",
+        message: validationErr.message || "AI returned incomplete or malformed recipe data."
+      });
+    }
 
     return res.status(200).json({
       status: "success",
-      message: "Recipe generated and validated successfully",
+      message: "Recipe synthesized and validated.",
       recipe: validatedRecipe
     });
   } catch (error: any) {
-    console.error("API Recipe Error:", error);
+    console.error("Backend API Error:", error);
     return res.status(500).json({ 
       status: "error", 
-      message: error.message || "An unexpected error occurred during recipe synthesis." 
+      message: error.message || "An unexpected error occurred during synthesis." 
     });
   }
 }

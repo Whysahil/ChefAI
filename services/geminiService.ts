@@ -1,5 +1,6 @@
 
 import { Recipe } from "../types";
+import { validateAndNormalizeRecipe } from "../lib/validations";
 
 async function callChefApi(action: string, payload: any = {}) {
   const response = await fetch('/api/chef', {
@@ -53,16 +54,19 @@ export async function generateRecipe(params: {
   });
   
   try {
-    const recipeData = JSON.parse(result.text);
+    const rawData = JSON.parse(result.text);
+    // LAYER 2: Use centralized validation
+    const validatedData = validateAndNormalizeRecipe(rawData);
+    
     return {
-      ...recipeData,
+      ...validatedData,
       id: Math.random().toString(36).substring(2, 11),
       dietaryNeeds: params.diet && params.diet !== 'None' ? [params.diet] : [],
       createdAt: Date.now()
     };
-  } catch (parseError) {
-    console.error("JSON Parse Error on AI Response:", result.text);
-    throw new Error("The synthesis engine returned an invalid protocol. Re-initialization recommended.");
+  } catch (parseError: any) {
+    console.error("AI Output Validation Failed:", parseError.message);
+    throw new Error(`Synthesis Validation Error: ${parseError.message}`);
   }
 }
 

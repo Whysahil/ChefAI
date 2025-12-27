@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wand2, ChefHat, Sparkles, Loader2, ChevronDown, ChevronUp, Save, Utensils, AlertTriangle, X, CheckCircle2, Info, RefreshCw } from 'lucide-react';
+import { Plus, Wand2, ChefHat, Sparkles, Loader2, ChevronDown, ChevronUp, Save, Utensils, AlertTriangle, X, CheckCircle2, Info } from 'lucide-react';
 import { ChefApiService } from '../services/ChefApiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -73,7 +73,12 @@ const Studio: React.FC = () => {
         cuisine: prefs.cuisine 
       });
       
-      if (res.status === 'success') {
+      if (res.status === 'success' && res.recipe) {
+        // LAYER 4: Defensive check before setting state
+        if (!res.recipe.ingredients?.length || !res.recipe.instructions?.length) {
+          throw new Error("UI Safety Protocol: AI returned a structure that passed schema but lacks critical culinary data.");
+        }
+
         const recipe: Recipe = {
           ...res.recipe,
           dietaryNeeds: [prefs.diet]
@@ -88,11 +93,17 @@ const Studio: React.FC = () => {
         } catch (imgErr) {
           console.warn("Visual generation skipped due to engine limits.");
         }
+      } else {
+        throw new Error(res.message || "The synthesis engine failed to initialize correctly.");
       }
     } catch (err: any) { 
-      // Handle validation errors specifically if 422 was returned
+      // Handle API errors based on response types
       const msg = err.message || "Synthesis interrupted.";
-      setErrorState(msg.includes('Integrity') ? "Validation Protocol Failure: AI generated incomplete data. Retrying may fix this." : msg);
+      if (msg.includes('Integrity') || msg.includes('ai_error')) {
+        setErrorState("Data Integrity Alert: The AI generated an invalid recipe structure. Refine your inputs and retry.");
+      } else {
+        setErrorState(msg);
+      }
     } finally { 
       setIsGenerating(false); 
     }
@@ -266,7 +277,7 @@ const Studio: React.FC = () => {
                    <div className="space-y-4 max-w-2xl">
                       <div className="flex gap-2">
                         <span className="px-3 py-1 bg-saffron-500 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">{generatedRecipe.cuisine}</span>
-                        <span className="px-3 py-1 bg-neutral-900/60 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg border border-white/20">{generatedRecipe.dietaryNeeds[0]}</span>
+                        <span className="px-3 py-1 bg-neutral-900/60 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg border border-white/20">{generatedRecipe.dietaryNeeds?.[0] || 'None'}</span>
                       </div>
                       <h3 className="text-5xl md:text-6xl font-serif font-black text-white italic tracking-tight leading-tight">{generatedRecipe.title}</h3>
                    </div>
