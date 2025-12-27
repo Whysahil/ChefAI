@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Utensils, Mic, Plus, Wand2, ChefHat, Sparkles, Loader2, Map, ChevronDown, ChevronUp, Search, Camera, Save, Check, RefreshCw } from 'lucide-react';
+import { Utensils, Mic, Plus, Wand2, ChefHat, Sparkles, Loader2, Map, ChevronDown, ChevronUp, Search, Camera, Save, Check, RefreshCw, Key } from 'lucide-react';
 import { generateRecipe, generateRecipeImage, analyzeIngredients } from '../services/geminiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -43,7 +43,7 @@ const Studio: React.FC = () => {
 
   const handleMicToggle = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("Visual accessibility: Speech recognition not supported in this environment.");
+    if (!SpeechRecognition) return alert("Visual accessibility: Speech recognition not supported.");
     
     const recognition = new SpeechRecognition();
     recognition.onstart = () => setIsListening(true);
@@ -69,7 +69,6 @@ const Studio: React.FC = () => {
 
   const captureFrame = async () => {
     if (!videoRef.current || !canvasRef.current) return;
-    
     setIsAnalyzing(true);
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -80,15 +79,13 @@ const Studio: React.FC = () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       const base64 = dataUrl.split(',')[1];
-      
       const found = await analyzeIngredients(base64);
       if (found.length > 0) {
         setIngredients(prev => [...new Set([...prev, ...found])]);
       } else {
-        alert("Chromatic identification failure. Adjust focus or lighting.");
+        alert("Chromatic identification failure.");
       }
     }
-    
     setIsAnalyzing(false);
     setShowCamera(false);
     if (videoRef.current?.srcObject) {
@@ -97,7 +94,7 @@ const Studio: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-    if (ingredients.length === 0) return alert("Please select or add at least one ingredient.");
+    if (ingredients.length === 0) return alert("Please select ingredients.");
     
     setIsGenerating(true);
     setGeneratedRecipe(null);
@@ -108,7 +105,15 @@ const Studio: React.FC = () => {
       setGeneratedRecipe({ ...recipe, imageUrl });
     } catch (err: any) { 
       console.error("Synthesis Error:", err);
-      alert(`Synthesis map interrupted: ${err.message || "Unknown error"}. Please check your connection or refine parameters.`); 
+      const errorStr = JSON.stringify(err);
+      if (errorStr.includes("API_KEY_INVALID") || errorStr.includes("400")) {
+        if (confirm("Calibration failure: Your API key appears invalid or restricted. Would you like to select a new one?")) {
+          // @ts-ignore
+          window.aistudio.openSelectKey().then(() => window.location.reload());
+        }
+      } else {
+        alert(`Synthesis map interrupted: ${err.message || "Unknown error"}.`); 
+      }
     } finally { 
       setIsGenerating(false); 
     }
@@ -134,7 +139,7 @@ const Studio: React.FC = () => {
             Synthesis<br/><span className="text-saffron-500">Laboratory.</span>
           </h2>
           <p className="text-neutral-500 font-medium text-lg md:text-xl max-w-2xl leading-relaxed">
-            Audit your pantry using multi-spectral vision and voice recognition to generate calibrated culinary blueprints.
+            Audit your pantry using multi-spectral vision to generate calibrated culinary blueprints.
           </p>
         </div>
       </header>
@@ -185,7 +190,7 @@ const Studio: React.FC = () => {
                       {ing} <Check size={12} />
                     </button>
                  )) : (
-                   <p className="text-xs text-neutral-300 italic">Standby: Awaiting ingredient metadata...</p>
+                   <p className="text-xs text-neutral-300 italic">Awaiting ingredient metadata...</p>
                  )}
               </div>
 
@@ -272,7 +277,7 @@ const Studio: React.FC = () => {
                   <ChefHat size={32} className="animate-bounce" />
                </div>
               <h2 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic">Mapping Vectors...</h2>
-              <p className="mt-2 text-neutral-400 font-medium tracking-tight">Applying culinary logic to ingredient metadata.</p>
+              <p className="mt-2 text-neutral-400 font-medium tracking-tight">Applying culinary logic to metadata.</p>
             </div>
           ) : generatedRecipe ? (
             <div className="space-y-10 animate-slide-up">

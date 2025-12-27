@@ -57,17 +57,21 @@ const recipeSchema = {
   ]
 };
 
+/**
+ * Crucial: Always returns a new instance to pick up the most current API key
+ * from the environment dialog.
+ */
 const getAIInstance = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key is missing. Please ensure your environment is configured correctly.");
+  if (!apiKey || apiKey === 'undefined') {
+    throw new Error("API Key selection missing. Please select a key in the system dialog.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 export async function analyzeIngredients(base64Image: string): Promise<string[]> {
   const ai = getAIInstance();
-  const prompt = "List every food ingredient visible in this image. Return as a comma-separated list of names only.";
+  const prompt = "Identify food ingredients in this image. Return a comma-separated list of names.";
   
   try {
     const response = await ai.models.generateContent({
@@ -94,22 +98,21 @@ export async function analyzeIngredients(base64Image: string): Promise<string[]>
 async function attemptRecipeGeneration(modelName: string, prompt: string): Promise<Recipe> {
   const ai = getAIInstance();
   
-  // Calibrated for stability and reasoning
   const response = await ai.models.generateContent({
     model: modelName,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
       responseMimeType: "application/json",
       responseSchema: recipeSchema,
-      maxOutputTokens: 12000, // Ample space for reasoning + JSON
-      thinkingConfig: { thinkingBudget: 2000 } // Modest reasoning budget for reliability
+      maxOutputTokens: 10000,
+      // Disable thinking for Flash to avoid key capability errors, only use for Pro
+      thinkingConfig: { thinkingBudget: modelName.includes('pro') ? 4000 : 0 }
     },
   });
 
   const text = response.text;
-  if (!text) throw new Error("The synthesis engine returned an empty response.");
+  if (!text) throw new Error("Empty response from AI engine.");
 
-  // Clean JSON string just in case markdown wrappers are present
   const cleanJson = text.replace(/^[^{]*({.*})[^}]*$/s, '$1').trim();
   const recipeData = JSON.parse(cleanJson);
   
@@ -130,33 +133,27 @@ export async function generateRecipe(params: {
   spiceLevel?: string,
   cookingPreference?: string
 }): Promise<Recipe> {
-  const prompt = `Generate a professional, high-quality culinary recipe based on these parameters:
-    - PANTRY: ${params.ingredients?.join(', ') || 'General pantry staples'}
-    - CUISINE: ${params.cuisine || 'International Fusion'}
-    - MEAL TYPE: ${params.mealType || 'Main Course'}
-    - DIET: ${params.diet || 'None'}
-    - SPICE: ${params.spiceLevel || 'Medium'}
-    - STYLE: ${params.cookingPreference || 'Gourmet'}
-    - SKILL: ${params.skill || 'Intermediate'}
-    
-    Ensure the recipe is creative, uses the provided ingredients effectively, and includes nutritional estimates.`;
+  const prompt = `Synthesize a professional recipe based on these parameters:
+    Pantry: ${params.ingredients?.join(', ') || 'General'}
+    Cuisine: ${params.cuisine}
+    Meal: ${params.mealType}
+    Dietary Constraint: ${params.diet}
+    Experience Level: ${params.skill}
+    Ensure complex nutritional accuracy.`;
 
   try {
-    // We use gemini-3-flash-preview as the primary for higher uptime and speed
     const recipe = await attemptRecipeGeneration('gemini-3-flash-preview', prompt);
-    if (params.diet && params.diet !== 'None') {
-      recipe.dietaryNeeds = [params.diet];
-    }
+    if (params.diet && params.diet !== 'None') recipe.dietaryNeeds = [params.diet];
     return recipe;
   } catch (err) {
-    console.warn("Primary synthesis pathway failed. Retrying with alternative logic...", err);
-    // Secondary attempt with Pro model if Flash fails (rare, but good for redundancy)
+    console.warn("ChefAI: Primary synthesis failed, attempting alternative route.", err);
     try {
+      // Pro fallback for more complex instructions
       const recipe = await attemptRecipeGeneration('gemini-3-pro-preview', prompt);
       if (params.diet && params.diet !== 'None') recipe.dietaryNeeds = [params.diet];
       return recipe;
     } catch (fallbackErr) {
-      console.error("All ChefAI synthesis pathways exhausted.", fallbackErr);
+      console.error("ChefAI: All synthesis pathways exhausted.", fallbackErr);
       throw fallbackErr;
     }
   }
@@ -168,7 +165,7 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
-        parts: [{ text: `Professional studio food photography of ${prompt}. Natural side lighting, shallow depth of field, high resolution, neutralized tones.` }]
+        parts: [{ text: `Gourmet food photography: ${prompt}. Cinematic lighting.` }]
       },
       config: {
         imageConfig: { aspectRatio: "16:9" }
@@ -179,19 +176,15 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
     if (part?.inlineData?.data) {
       return `data:image/png;base64,${part.inlineData.data}`;
     }
-    throw new Error("No visual data generated.");
+    throw new Error("No visual synthesis.");
   } catch (err) {
-    console.warn("Visual synthesis failed. Using placeholder asset.", err);
     return 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
   }
 }
 
 export function createChefChat(recipe: Recipe) {
   const ai = getAIInstance();
-  const systemInstruction = `You are a professional culinary consultant assisting with the recipe: "${recipe.title}". 
-    Reference these ingredients: ${recipe.ingredients.map(i => i.name).join(', ')}. 
-    Provide concise, expert advice on substitutions, techniques, and troubleshooting.`;
-    
+  const systemInstruction = `You are a ChefAI assistant for "${recipe.title}". Provide brief, technical culinary advice.`;
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: { systemInstruction }
