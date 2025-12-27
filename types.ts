@@ -5,13 +5,19 @@ export interface Ingredient {
   unit: string;
 }
 
+export interface Nutrition {
+  calories: number;
+  protein: string;
+  carbs: string;
+  fat: string;
+}
+
 export interface Recipe {
   id: string;
   title: string;
   description: string;
   cuisine: string;
   mealType: string;
-  dietaryNeeds: string[];
   prepTime: string;
   cookTime: string;
   servings: number;
@@ -19,16 +25,12 @@ export interface Recipe {
   ingredients: Ingredient[];
   instructions: string[];
   tips: string[];
-  nutrition: {
-    calories: number;
-    protein: string;
-    carbs: string;
-    fat: string;
-  };
-  servingSuggestions: string;
   substitutions: string[];
+  servingSuggestions: string;
+  nutrition: Nutrition;
   imagePrompt: string;
   imageUrl?: string;
+  dietaryNeeds: string[];
   createdAt: number;
 }
 

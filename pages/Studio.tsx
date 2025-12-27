@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wand2, ChefHat, Sparkles, Loader2, ChevronDown, ChevronUp, Save, Utensils, AlertTriangle, X, CheckCircle2, Info } from 'lucide-react';
+import { Plus, Wand2, ChefHat, Sparkles, Loader2, ChevronDown, ChevronUp, Save, Utensils, AlertTriangle, X, CheckCircle2, Info, RefreshCw } from 'lucide-react';
 import { ChefApiService } from '../services/ChefApiService';
 import { Recipe } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +24,6 @@ const Studio: React.FC = () => {
     mealType: 'Dinner'
   });
 
-  // Extract core ingredients from specified categories for validation
   const coreIngredientsList = useMemo(() => {
     const coreCategories = ['Vegetables', 'Proteins', 'Grains & Staples'];
     return INGREDIENT_CATEGORIES
@@ -34,7 +33,6 @@ const Studio: React.FC = () => {
 
   const validationStatus = useMemo(() => {
     const hasAny = ingredients.length > 0;
-    // Check if at least one selected ingredient is from the core categories
     const hasCore = ingredients.some(ing => coreIngredientsList.includes(ing));
     return { hasAny, hasCore };
   }, [ingredients, coreIngredientsList]);
@@ -55,15 +53,13 @@ const Studio: React.FC = () => {
     setErrorState(null);
     setIsSaved(false);
 
-    // Initial check: must have at least something
     if (ingredients.length === 0) {
-      setValidationError("Selection Matrix Empty: Please add at least one ingredient to begin synthesis.");
+      setValidationError("Selection Matrix Empty: Add ingredients to begin synthesis.");
       return;
     }
 
-    // Core validation: must have a base ingredient for a valid recipe
     if (!validationStatus.hasCore) {
-      setValidationError("Core Requirement Missing: A master recipe needs a solid foundation. Please include at least one Vegetable, Protein, or Grain.");
+      setValidationError("Core Requirement Missing: A master recipe needs a foundation. Include at least one Vegetable, Protein, or Grain.");
       return;
     }
 
@@ -78,26 +74,25 @@ const Studio: React.FC = () => {
       });
       
       if (res.status === 'success') {
-        const recipe = {
+        const recipe: Recipe = {
           ...res.recipe,
-          id: Math.random().toString(36).substr(2, 9),
-          createdAt: Date.now(),
           dietaryNeeds: [prefs.diet]
         };
         setGeneratedRecipe(recipe);
         
-        // Lazy load image
         try {
           const imgRes = await ChefApiService.generateImage(recipe.imagePrompt);
           if (imgRes.status === 'success') {
             setGeneratedRecipe(prev => prev ? { ...prev, imageUrl: `data:image/png;base64,${imgRes.data}` } : null);
           }
         } catch (imgErr) {
-          console.warn("Failed to generate image", imgErr);
+          console.warn("Visual generation skipped due to engine limits.");
         }
       }
     } catch (err: any) { 
-      setErrorState(err.message || "Synthesis interrupted. Our culinary engines encountered an unexpected variable.");
+      // Handle validation errors specifically if 422 was returned
+      const msg = err.message || "Synthesis interrupted.";
+      setErrorState(msg.includes('Integrity') ? "Validation Protocol Failure: AI generated incomplete data. Retrying may fix this." : msg);
     } finally { 
       setIsGenerating(false); 
     }
@@ -219,11 +214,11 @@ const Studio: React.FC = () => {
 
           <div className="space-y-4">
             {(validationError || errorState) && (
-              <div className="p-5 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 dark:border-paprika-900/40 rounded-3xl flex gap-4 text-paprika-600 animate-fade-in">
+              <div className="p-5 bg-paprika-50 dark:bg-paprika-900/20 border border-paprika-100 dark:border-paprika-900/40 rounded-3xl flex gap-4 text-paprika-600 animate-fade-in shadow-sm">
                 <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
                 <div className="flex-1 space-y-1">
                   <p className="text-[11px] font-black uppercase tracking-wider">Protocol Alert</p>
-                  <p className="text-xs font-medium opacity-90">{validationError || errorState}</p>
+                  <p className="text-xs font-medium opacity-90 leading-relaxed">{validationError || errorState}</p>
                 </div>
                 <button onClick={() => {setErrorState(null); setValidationError(null)}} className="flex-shrink-0 h-fit"><X size={16}/></button>
               </div>
@@ -250,7 +245,7 @@ const Studio: React.FC = () => {
               </div>
               <div className="text-center space-y-6 max-w-sm px-6">
                 <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500">Processing Culinary Intelligence</p>
-                <p className="text-base text-neutral-500 dark:text-neutral-400 font-medium italic">Gemini 3 Pro is curating your professional recipe JSON...</p>
+                <p className="text-base text-neutral-500 dark:text-neutral-400 font-medium italic">Gemini 3 Pro is validating recipe structure via Zod...</p>
               </div>
             </div>
           ) : generatedRecipe ? (

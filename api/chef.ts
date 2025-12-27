@@ -61,22 +61,29 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { action, payload } = req.body;
-  
-  // Use process.env.API_KEY directly as required by guidelines
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = process.env.API_KEY;
 
-  if (action === 'health') {
-    return res.status(200).json({ status: 'healthy' });
+  if (!apiKey) {
+    return res.status(500).json({ status: "error", message: "AI Engine not configured." });
   }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     switch (action) {
       case 'generate': {
         const promptText = (payload && typeof payload.prompt === 'string') ? payload.prompt : 'Create a recipe.';
-        // Simplified contents for text-only prompt
+        
         const genResult = await ai.models.generateContent({
           model: 'gemini-3-pro-preview',
-          contents: `Act as a Michelin star chef. Create a unique recipe. Output ONLY valid JSON matching the schema. CONTEXT: ${promptText}`,
+          contents: `SYSTEM: You are a Michelin Star Chef. 
+TASK: Generate a professional recipe JSON based on the context provided.
+RULES: 
+1. Output ONLY a single valid JSON object.
+2. Adhere strictly to the requested schema.
+3. Ensure all ingredient amounts are specific.
+4. Ensure instructions are clear and numbered.
+CONTEXT: ${promptText}`,
           config: {
             responseMimeType: "application/json",
             responseSchema: nativeRecipeSchema,
@@ -84,36 +91,42 @@ export default async function handler(req: any, res: any) {
           },
         });
         
-        const text: string = genResult.text ?? "";
-        if (!text) {
-          throw new Error("The synthesis engine returned an empty text response.");
+        const rawText = genResult.text ?? "";
+        if (!rawText) throw new Error("AI returned empty content.");
+
+        let parsedJson;
+        try {
+          parsedJson = JSON.parse(rawText);
+        } catch (e) {
+          throw new Error("AI output could not be parsed as valid JSON.");
         }
 
-        const rawJson = JSON.parse(text);
-        const validated = validateAndNormalizeRecipe(rawJson);
+        // Secondary Validation Layer (Zod)
+        const validated = validateAndNormalizeRecipe(parsedJson);
 
-        return res.status(200).json({ status: "success", text: JSON.stringify(validated) });
+        return res.status(200).json({ 
+          status: "success", 
+          text: JSON.stringify(validated) 
+        });
       }
 
       case 'analyze': {
         const imagePayload = payload?.image;
         if (!imagePayload || typeof imagePayload !== 'string') {
-          return res.status(400).json({ status: "error", message: "Image data is required." });
+          return res.status(400).json({ status: "error", message: "Image data required for analysis." });
         }
-        // Correct multimodal content structure per guidelines
+        
         const visionResult = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: {
             parts: [
-              { text: "Identify all culinary ingredients in this image. List them clearly, separated by commas." },
+              { text: "List every culinary ingredient you identify in this image. Format: ingredient1, ingredient2, ..." },
               { inlineData: { mimeType: "image/jpeg", data: imagePayload } }
             ]
           }
         });
-        const text: string = visionResult.text ?? "";
-        if (!text) {
-          throw new Error("Vision analysis failed.");
-        }
+        
+        const text = visionResult.text ?? "";
         return res.status(200).json({ status: "success", text });
       }
 
@@ -125,30 +138,25 @@ export default async function handler(req: any, res: any) {
           config: { imageConfig: { aspectRatio: "16:9" } }
         });
         
-        let base64Data: string = '';
+        let base64Data = '';
         const candidates = imgResult.candidates;
-        if (candidates && candidates.length > 0) {
-          const content = candidates[0].content;
-          if (content && content.parts) {
-            for (const part of content.parts) {
-              if (part.inlineData && part.inlineData.data) {
-                base64Data = part.inlineData.data;
-                break;
-              }
-            }
-          }
+        if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
+          const part = candidates[0].content.parts.find(p => p.inlineData?.data);
+          if (part?.inlineData?.data) base64Data = part.inlineData.data;
         }
+        
+        if (!base64Data) throw new Error("Visual synthesis produced no image data.");
         return res.status(200).json({ status: "success", data: base64Data });
       }
 
       default:
-        return res.status(400).json({ status: "error", error: 'INVALID_ACTION' });
+        return res.status(400).json({ status: "error", message: "Unknown action protocol." });
     }
   } catch (error: any) {
-    console.error("Chef API Error:", error);
-    return res.status(500).json({ 
+    console.error("Chef API Protocol Fault:", error);
+    return res.status(error.message?.includes('Data Integrity') ? 422 : 500).json({ 
       status: "error", 
-      message: error.message || "Synthesis error during Chef AI operation." 
+      message: error.message || "Synthesis interrupted." 
     });
   }
 }
