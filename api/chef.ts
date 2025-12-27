@@ -79,11 +79,12 @@ export default async function handler(req: any, res: any) {
   try {
     switch (action) {
       case 'generate':
+        const promptText = typeof payload?.prompt === 'string' ? payload.prompt : 'Create a masterpiece recipe.';
         const genResult = await ai.models.generateContent({
           model: 'gemini-3-pro-preview',
           contents: [{ 
             role: 'user', 
-            parts: [{ text: `Act as a Michelin star chef. Create a unique, high-quality recipe. Output ONLY valid JSON matching the schema. CONTEXT: ${payload.prompt}` }] 
+            parts: [{ text: `Act as a Michelin star chef. Create a unique, high-quality recipe. Output ONLY valid JSON matching the schema. CONTEXT: ${promptText}` }] 
           }],
           config: {
             responseMimeType: "application/json",
@@ -99,6 +100,9 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ status: "success", text: responseText });
 
       case 'analyze':
+        if (!payload?.image || typeof payload.image !== 'string') {
+          return res.status(400).json({ status: "error", message: "Image data is required for analysis." });
+        }
         const visionResult = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: [{
@@ -115,18 +119,19 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ status: "success", text: visionText });
 
       case 'image':
+        const imgPromptText = typeof payload?.prompt === 'string' ? payload.prompt : 'Gourmet food plating';
         const imgResult = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: payload.prompt }] },
+          contents: { parts: [{ text: imgPromptText }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         });
         
         let base64Data = '';
         const candidates = imgResult.candidates;
         if (candidates && candidates.length > 0) {
-          const parts = candidates[0].content?.parts;
-          if (parts) {
-            for (const part of parts) {
+          const content = candidates[0].content;
+          if (content && content.parts) {
+            for (const part of content.parts) {
               if (part.inlineData) {
                 base64Data = part.inlineData.data;
                 break;
