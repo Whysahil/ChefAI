@@ -61,24 +61,44 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // API_KEY is obtained exclusively from the environment variable process.env.API_KEY.
   const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API_KEY_MISSING', message: 'Server configuration error.' });
+  const { action, payload } = req.body;
+
+  // Synthesis Engine Health Check
+  if (action === 'health') {
+    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+      return res.status(200).json({ 
+        status: 'unconfigured', 
+        message: 'Synthesis engine offline: API_KEY is missing from server runtime.' 
+      });
+    }
+    return res.status(200).json({ status: 'healthy' });
   }
 
-  const { action, payload } = req.body;
+  if (!apiKey) {
+    return res.status(500).json({ 
+      error: 'API_KEY_MISSING', 
+      message: 'CALIBRATION REQUIRED. The ChefAI synthesis engine is offline.' 
+    });
+  }
+
+  // Create a new GoogleGenAI instance right before making an API call 
+  // to ensure it always uses the most up-to-date API key.
   const ai = new GoogleGenAI({ apiKey });
 
   try {
     switch (action) {
       case 'generate':
         const genResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          // Using gemini-3-pro-preview for complex reasoning tasks like recipe synthesis.
+          model: 'gemini-3-pro-preview',
           contents: [{ role: 'user', parts: [{ text: payload.prompt }] }],
           config: {
             responseMimeType: "application/json",
             responseSchema: recipeSchema,
-            thinkingConfig: { thinkingBudget: 0 }
+            // Allow the model to think as much as needed for the complex recipe logic.
+            thinkingConfig: { thinkingBudget: 32768 }
           },
         });
         return res.status(200).json({ text: genResponse.text });
@@ -103,14 +123,19 @@ export default async function handler(req: any, res: any) {
           contents: { parts: [{ text: payload.prompt }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         });
-        const part = imgResponse.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        return res.status(200).json({ data: part?.inlineData?.data || '' });
+        // Iterate through all parts to find the image part.
+        const imagePart = imgResponse.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+        return res.status(200).json({ data: imagePart?.inlineData?.data || '' });
 
       default:
         return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (error: any) {
-    console.error('API Route Error:', error);
+    console.error('Synthesis Error:', error);
+    // If the request fails with "Requested entity was not found.", it may indicate a key issue.
+    if (error.message?.includes("Requested entity was not found")) {
+        return res.status(404).json({ error: 'API_KEY_INVALID', message: 'The provided API Key was not found or is invalid.' });
+    }
     return res.status(500).json({ error: 'SYNTHESIS_FAILED', message: error.message });
   }
 }

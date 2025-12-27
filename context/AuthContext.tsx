@@ -11,6 +11,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   switchAccount: (uid: string) => void;
   updatePreferences: (prefs: Partial<UserPreferences>) => void;
+  updateProfile: (data: { displayName?: string; theme?: 'light' | 'dark' }) => void;
   saveRecipe: (recipe: Recipe) => void;
   deleteRecipe: (id: string) => void;
   savedRecipes: Recipe[];
@@ -102,6 +103,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateProfile = (data: { displayName?: string; theme?: 'light' | 'dark' }) => {
+    if (user) {
+      const updatedUser = { ...user, ...data };
+      const updatedAccounts = accounts.map(a => a.uid === user.uid ? updatedUser : a);
+      setUser(updatedUser);
+      setAccounts(updatedAccounts);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAccounts));
+    }
+  };
+
   const saveRecipe = (recipe: Recipe) => {
     const updated = [...savedRecipes, recipe];
     setSavedRecipes(updated);
@@ -117,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{ 
       user, accounts, loading, login, signup, logout, 
-      switchAccount, updatePreferences, saveRecipe, deleteRecipe, savedRecipes 
+      switchAccount, updatePreferences, updateProfile, saveRecipe, deleteRecipe, savedRecipes 
     }}>
       {children}
     </AuthContext.Provider>

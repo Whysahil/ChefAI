@@ -1,7 +1,7 @@
 
 import { Recipe } from "../types";
 
-async function callChefApi(action: string, payload: any) {
+async function callChefApi(action: string, payload: any = {}) {
   const response = await fetch('/api/chef', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -13,6 +13,15 @@ async function callChefApi(action: string, payload: any) {
     throw new Error(data.error || 'API_ERROR');
   }
   return data;
+}
+
+export async function checkServerHealth(): Promise<'healthy' | 'unconfigured'> {
+  try {
+    const result = await callChefApi('health');
+    return result.status;
+  } catch (err) {
+    return 'unconfigured';
+  }
 }
 
 export async function analyzeIngredients(base64Image: string): Promise<string[]> {
@@ -27,10 +36,13 @@ export async function generateRecipe(params: {
   mealType?: string,
   skill?: string
 }): Promise<Recipe> {
-  const prompt = `Synthesize a professional recipe for a ${params.skill} level cook. 
-    Ingredients: ${params.ingredients?.join(', ') || 'General pantry staples'}. 
-    Cuisine: ${params.cuisine}. 
-    Diet: ${params.diet}.`;
+  const prompt = `Synthesize a professional recipe. 
+    MANDATORY DIETARY CONSTRAINT: ${params.diet || 'None'}. 
+    USER SKILL: ${params.skill} level cook. 
+    Ingredients available: ${params.ingredients?.join(', ') || 'General pantry staples'}. 
+    Preferred Cuisine: ${params.cuisine}. 
+    Meal Context: ${params.mealType}.
+    Ensure the recipe strictly follows the ${params.diet} dietary requirements.`;
 
   const result = await callChefApi('generate', { prompt });
   const recipeData = JSON.parse(result.text);
@@ -38,7 +50,7 @@ export async function generateRecipe(params: {
   return {
     ...recipeData,
     id: Math.random().toString(36).substring(2, 11),
-    dietaryNeeds: [],
+    dietaryNeeds: params.diet ? [params.diet] : [],
     createdAt: Date.now()
   };
 }
@@ -52,14 +64,11 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
   }
 }
 
-// Note: createChefChat for real-time streaming would require an Edge Function with WebSockets, 
-// for this implementation we will handle simple chat via the same synthesis endpoint if needed.
 export function createChefChat(recipe: Recipe) {
-  // Placeholder implementation for chat via API proxy
   return {
     sendMessage: async (msg: { message: string }) => {
       const prompt = `Assistant for "${recipe.title}". User asks: ${msg.message}`;
-      const result = await callChefApi('generate', { prompt }); // Simplified for demo
+      const result = await callChefApi('generate', { prompt });
       return { text: result.text };
     }
   };
