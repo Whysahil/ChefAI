@@ -1,6 +1,4 @@
 
-import { NextRequest } from 'next/server';
-
 export default async function handler(req: any, res: any) {
   const { method } = req;
 

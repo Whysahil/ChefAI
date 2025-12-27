@@ -92,8 +92,9 @@ export default async function handler(req: any, res: any) {
           },
         });
         
-        if (!genResult.text) throw new Error("The AI engine returned an empty synthesis.");
-        return res.status(200).json({ status: "success", text: genResult.text });
+        const text = genResult.text;
+        if (!text) throw new Error("The AI engine returned an empty synthesis.");
+        return res.status(200).json({ status: "success", text });
 
       case 'analyze':
         const visionResult = await ai.models.generateContent({
@@ -115,10 +116,13 @@ export default async function handler(req: any, res: any) {
         });
         
         let base64Data = '';
-        for (const part of imgResult.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-            base64Data = part.inlineData.data;
-            break;
+        const candidates = imgResult.candidates;
+        if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
+          for (const part of candidates[0].content.parts) {
+            if (part.inlineData) {
+              base64Data = part.inlineData.data;
+              break;
+            }
           }
         }
         return res.status(200).json({ status: "success", data: base64Data });

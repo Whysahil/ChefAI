@@ -63,7 +63,9 @@ export default async function handler(req: any, res: any) {
         contents: { parts: [{ text: req.body.prompt }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
-      const data = imgResult.candidates[0].content.parts.find(p => p.inlineData)?.inlineData?.data;
+      
+      const candidates = imgResult.candidates;
+      const data = candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
       return res.status(200).json({ status: "success", data });
     }
 
@@ -77,10 +79,13 @@ export default async function handler(req: any, res: any) {
       }
     });
 
+    const responseText = response.text;
+    if (!responseText) throw new Error("Synthesis failed: Empty response text.");
+
     return res.status(200).json({
       status: "success",
       message: "Recipe generated successfully",
-      recipe: JSON.parse(response.text)
+      recipe: JSON.parse(responseText)
     });
   } catch (error: any) {
     return res.status(500).json({ status: "error", message: error.message });
