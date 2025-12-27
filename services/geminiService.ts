@@ -10,7 +10,10 @@ async function callChefApi(action: string, payload: any = {}) {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'API_ERROR');
+    const error = new Error(data.message || 'API_ERROR') as any;
+    error.status = data.status || 'error';
+    error.error = data.error;
+    throw error;
   }
   return data;
 }
@@ -44,7 +47,11 @@ export async function generateRecipe(params: {
     Meal Context: ${params.mealType}.
     Ensure the recipe strictly follows the ${params.diet} dietary requirements.`;
 
-  const result = await callChefApi('generate', { prompt });
+  const result = await callChefApi('generate', { 
+    prompt, 
+    ingredients: params.ingredients 
+  });
+  
   const recipeData = JSON.parse(result.text);
   
   return {

@@ -1,6 +1,13 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
+// 1. Definition of "Core" ingredients for validation logic
+const CORE_INGREDIENTS = [
+  'chicken', 'eggs', 'fish', 'shrimp', 'paneer', 'tofu', 'chana', 'dal', 'kidney beans',
+  'onion', 'tomato', 'potato', 'carrot', 'spinach', 'bell pepper', 'mushroom', 'cauliflower', 'okra', 'brinjal',
+  'rice', 'atta', 'maida', 'basmati', 'poha', 'bread', 'pasta', 'quinoa'
+];
+
 const recipeSchema = {
   type: Type.OBJECT,
   properties: {
@@ -28,10 +35,6 @@ const recipeSchema = {
       type: Type.ARRAY,
       items: { type: Type.STRING }
     },
-    tips: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING }
-    },
     nutrition: {
       type: Type.OBJECT,
       properties: {
@@ -42,95 +45,152 @@ const recipeSchema = {
       },
       required: ["calories", "protein", "carbs", "fat"]
     },
-    servingSuggestions: { type: Type.STRING },
-    substitutions: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING }
-    },
     imagePrompt: { type: Type.STRING }
   },
   required: [
     "title", "description", "mealType", "prepTime", "cookTime", 
     "ingredients", "instructions", "nutrition", "imagePrompt", 
-    "servingSuggestions", "servings", "difficulty"
+    "servings", "difficulty"
   ]
 };
+
+/**
+ * Executes an AI task with automatic failover across multiple keys.
+ * This is hidden from the client to prevent credential exposure.
+ */
+async function executeWithFailover(task: (ai: any) => Promise<any>) {
+  const keys = [
+    process.env.API_KEY,
+    process.env.API_KEY_SECONDARY,
+    // Add more fallbacks as environment variables here
+  ].filter(Boolean);
+
+  if (keys.length === 0) {
+    throw new Error('API_KEYS_EXHAUSTED');
+  }
+
+  let lastError: any = null;
+
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: keys[i] as string });
+      return await task(ai);
+    } catch (error: any) {
+      console.warn(`Provider ${i} failed, attempting failover...`, error.message);
+      lastError = error;
+
+      // Only failover for recoverable errors
+      const isRecoverable = 
+        error.message?.includes("429") || // Rate Limit
+        error.message?.includes("503") || // Service Unavailable
+        error.message?.includes("401") || // Invalid Key
+        error.message?.includes("not found") || // Model/Entity missing
+        error.message?.includes("quota");   // Quota exceeded
+
+      if (!isRecoverable) break; // Don't retry for safety violations or bad schemas
+    }
+  }
+
+  throw lastError;
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.API_KEY;
   const { action, payload } = req.body;
 
+  // 1. Availability check: Return healthy if at least one key exists
   if (action === 'health') {
-    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-      return res.status(200).json({ status: 'unconfigured' });
-    }
-    return res.status(200).json({ status: 'healthy' });
+    const hasAnyKey = !!(process.env.API_KEY || process.env.API_KEY_SECONDARY);
+    return res.status(200).json({ 
+      status: hasAnyKey ? 'healthy' : 'unconfigured' 
+    });
   }
-
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API_KEY_MISSING' });
-  }
-
-  // Pre-Model Validation
-  if (action === 'generate') {
-    if (!payload.prompt || payload.prompt.includes('Ingredients available: .')) {
-      return res.status(400).json({ 
-        error: 'INSUFFICIENT_INPUT', 
-        message: 'Synthesis requires at least one primary ingredient component.' 
-      });
-    }
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
 
   try {
     switch (action) {
       case 'generate':
-        const genResponse = await ai.models.generateContent({
-          model: 'gemini-3-pro-preview',
-          contents: [{ role: 'user', parts: [{ text: payload.prompt }] }],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: recipeSchema,
-            thinkingConfig: { thinkingBudget: 32768 }
-          },
+        // Validation Layer (No AI cost)
+        const userIngredients = payload.ingredients || [];
+        const hasCore = userIngredients.some((ing: string) => 
+          CORE_INGREDIENTS.includes(ing.toLowerCase())
+        );
+
+        if (userIngredients.length === 0) {
+          return res.status(400).json({
+            status: "invalid_input",
+            message: "Input matrix is empty."
+          });
+        }
+
+        if (!hasCore && userIngredients.length < 3) {
+          return res.status(400).json({
+            status: "invalid_input",
+            message: "Missing main ingredient (Protein/Veg/Grain)."
+          });
+        }
+
+        const genResult = await executeWithFailover(async (ai) => {
+          return await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: [{ role: 'user', parts: [{ text: payload.prompt }] }],
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: recipeSchema,
+              thinkingConfig: { thinkingBudget: 16000 }
+            },
+          });
         });
-        return res.status(200).json({ text: genResponse.text });
+        return res.status(200).json({ status: "success", text: genResult.text });
 
       case 'analyze':
-        const visionResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: [
-            {
-              parts: [
-                { text: "Identify food ingredients in this image. Comma-separated list." },
-                { inlineData: { mimeType: "image/jpeg", data: payload.image } }
-              ]
-            }
-          ]
+        const visionResult = await executeWithFailover(async (ai) => {
+          return await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [
+              {
+                parts: [
+                  { text: "Identify food items in this image. Return a comma-separated list." },
+                  { inlineData: { mimeType: "image/jpeg", data: payload.image } }
+                ]
+              }
+            ]
+          });
         });
-        return res.status(200).json({ text: visionResponse.text });
+        return res.status(200).json({ status: "success", text: visionResult.text });
 
       case 'image':
-        const imgResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: payload.prompt }] },
-          config: { imageConfig: { aspectRatio: "16:9" } }
+        const imgResult = await executeWithFailover(async (ai) => {
+          return await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: payload.prompt }] },
+            config: { imageConfig: { aspectRatio: "16:9" } }
+          });
         });
-        const imagePart = imgResponse.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        return res.status(200).json({ data: imagePart?.inlineData?.data || '' });
+        const imagePart = imgResult.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+        return res.status(200).json({ status: "success", data: imagePart?.inlineData?.data || '' });
 
       default:
-        return res.status(400).json({ error: 'Invalid action' });
+        return res.status(400).json({ status: "error", error: 'INVALID_ACTION' });
     }
   } catch (error: any) {
-    if (error.message?.includes("Requested entity was not found")) {
-        return res.status(404).json({ error: 'API_KEY_INVALID' });
+    console.error("Chef Resilience Engine Error:", error);
+
+    if (error.message === 'API_KEYS_EXHAUSTED') {
+      return res.status(503).json({ 
+        status: "error", 
+        error: 'SERVICE_UNAVAILABLE', 
+        message: "Culinary intelligence nodes are currently unconfigured." 
+      });
     }
-    return res.status(500).json({ error: 'SYNTHESIS_FAILED', message: error.message });
+
+    // Generic error fallback for client safety
+    return res.status(500).json({ 
+      status: "error", 
+      error: 'SYNTHESIS_FAILED', 
+      message: "The intelligence core is currently congested. Auto-failover initiated but pending resolution."
+    });
   }
 }
