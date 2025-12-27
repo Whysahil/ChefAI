@@ -97,6 +97,8 @@ const Studio: React.FC = () => {
   };
 
   const handleGenerate = async () => {
+    if (ingredients.length === 0) return alert("Please select or add at least one ingredient.");
+    
     setIsGenerating(true);
     setGeneratedRecipe(null);
     setIsSaved(false);
@@ -104,8 +106,9 @@ const Studio: React.FC = () => {
       const recipe = await generateRecipe({ ingredients, ...prefs });
       const imageUrl = await generateRecipeImage(recipe.imagePrompt);
       setGeneratedRecipe({ ...recipe, imageUrl });
-    } catch (err) { 
-      alert("Synthesis map interrupted. Refine parameters."); 
+    } catch (err: any) { 
+      console.error("Synthesis Error:", err);
+      alert(`Synthesis map interrupted: ${err.message || "Unknown error"}. Please check your connection or refine parameters.`); 
     } finally { 
       setIsGenerating(false); 
     }
