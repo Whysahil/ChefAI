@@ -58,32 +58,32 @@ const recipeSchema = {
 };
 
 /**
- * Crucial: Always returns a new instance to pick up the most current API key
- * from the environment dialog.
+ * Always creates a fresh instance to use the latest API key injected into the environment.
  */
 const getAIInstance = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'undefined') {
-    throw new Error("API Key selection missing. Please select a key in the system dialog.");
+  if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    throw new Error("API_KEY_MISSING: Please select a valid API key from the system dialog.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 export async function analyzeIngredients(base64Image: string): Promise<string[]> {
-  const ai = getAIInstance();
-  const prompt = "Identify food ingredients in this image. Return a comma-separated list of names.";
-  
   try {
+    const ai = getAIInstance();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [
         {
           parts: [
-            { text: prompt },
+            { text: "List every food ingredient visible in this image. Return a simple comma-separated list of names only." },
             { inlineData: { mimeType: "image/jpeg", data: base64Image } }
           ]
         }
-      ]
+      ],
+      config: {
+        thinkingConfig: { thinkingBudget: 0 } // Disable thinking for vision for max speed/compat
+      }
     });
     
     const text = response.text;
@@ -91,7 +91,7 @@ export async function analyzeIngredients(base64Image: string): Promise<string[]>
     return text.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
   } catch (err) {
     console.error("ChefAI Vision Analysis Failure:", err);
-    return [];
+    throw err;
   }
 }
 
@@ -105,13 +105,13 @@ async function attemptRecipeGeneration(modelName: string, prompt: string): Promi
       responseMimeType: "application/json",
       responseSchema: recipeSchema,
       maxOutputTokens: 10000,
-      // Disable thinking for Flash to avoid key capability errors, only use for Pro
-      thinkingConfig: { thinkingBudget: modelName.includes('pro') ? 4000 : 0 }
+      // Flash model works best with 0 thinking budget for standard compatibility
+      thinkingConfig: { thinkingBudget: modelName.includes('pro') ? 2000 : 0 }
     },
   });
 
   const text = response.text;
-  if (!text) throw new Error("Empty response from AI engine.");
+  if (!text) throw new Error("The synthesis engine returned an empty response.");
 
   const cleanJson = text.replace(/^[^{]*({.*})[^}]*$/s, '$1').trim();
   const recipeData = JSON.parse(cleanJson);
@@ -133,39 +133,39 @@ export async function generateRecipe(params: {
   spiceLevel?: string,
   cookingPreference?: string
 }): Promise<Recipe> {
-  const prompt = `Synthesize a professional recipe based on these parameters:
-    Pantry: ${params.ingredients?.join(', ') || 'General'}
-    Cuisine: ${params.cuisine}
-    Meal: ${params.mealType}
-    Dietary Constraint: ${params.diet}
-    Experience Level: ${params.skill}
-    Ensure complex nutritional accuracy.`;
+  const prompt = `Act as an elite Master Chef. Synthesize a professional, accurate recipe.
+    - INGREDIENTS TO USE: ${params.ingredients?.join(', ') || 'Standard pantry'}
+    - CUISINE STYLE: ${params.cuisine}
+    - MEAL CATEGORY: ${params.mealType}
+    - DIETARY NEEDS: ${params.diet}
+    - DIFFICULTY: ${params.skill}
+    - VIBE: ${params.cookingPreference}
+    - SPICE: ${params.spiceLevel}
+    
+    Ensure nutritional values are calculated accurately for the servings specified.`;
 
   try {
-    const recipe = await attemptRecipeGeneration('gemini-3-flash-preview', prompt);
-    if (params.diet && params.diet !== 'None') recipe.dietaryNeeds = [params.diet];
-    return recipe;
+    // Primary attempt with Flash (faster, high reliability)
+    return await attemptRecipeGeneration('gemini-3-flash-preview', prompt);
   } catch (err) {
-    console.warn("ChefAI: Primary synthesis failed, attempting alternative route.", err);
+    console.warn("ChefAI: Primary synthesis interrupted. Attempting high-precision fallback...", err);
     try {
-      // Pro fallback for more complex instructions
-      const recipe = await attemptRecipeGeneration('gemini-3-pro-preview', prompt);
-      if (params.diet && params.diet !== 'None') recipe.dietaryNeeds = [params.diet];
-      return recipe;
+      // Pro fallback for more complex reasoning if the first one failed
+      return await attemptRecipeGeneration('gemini-3-pro-preview', prompt);
     } catch (fallbackErr) {
-      console.error("ChefAI: All synthesis pathways exhausted.", fallbackErr);
+      console.error("ChefAI: Final synthesis failure.", fallbackErr);
       throw fallbackErr;
     }
   }
 }
 
 export async function generateRecipeImage(prompt: string): Promise<string> {
-  const ai = getAIInstance();
   try {
+    const ai = getAIInstance();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
-        parts: [{ text: `Gourmet food photography: ${prompt}. Cinematic lighting.` }]
+        parts: [{ text: `Professional food photography of ${prompt}. Macro detail, cinematic natural lighting, 4k.` }]
       },
       config: {
         imageConfig: { aspectRatio: "16:9" }
@@ -176,15 +176,16 @@ export async function generateRecipeImage(prompt: string): Promise<string> {
     if (part?.inlineData?.data) {
       return `data:image/png;base64,${part.inlineData.data}`;
     }
-    throw new Error("No visual synthesis.");
+    throw new Error("No visual data found.");
   } catch (err) {
+    console.warn("ChefAI: Visual synthesis skipped.", err);
     return 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?auto=format&fit=crop&q=80&w=1200';
   }
 }
 
 export function createChefChat(recipe: Recipe) {
   const ai = getAIInstance();
-  const systemInstruction = `You are a ChefAI assistant for "${recipe.title}". Provide brief, technical culinary advice.`;
+  const systemInstruction = `You are a professional culinary assistant for "${recipe.title}". Provide brief, technical expert advice on techniques or substitutions.`;
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: { systemInstruction }
