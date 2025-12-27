@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Wand2, ChefHat, Sparkles, Loader2, ShieldAlert, ChevronDown, ChevronUp, Check, AlertCircle, Terminal, Heart, Info, Utensils, RefreshCw, Key, Save } from 'lucide-react';
 import { generateRecipe, generateRecipeImage, checkServerHealth } from '../services/geminiService';
 import { Recipe } from '../types';
@@ -7,21 +6,21 @@ import { useAuth } from '../context/AuthContext';
 import { CUISINES, SKILL_LEVELS, INGREDIENT_CATEGORIES, DIETS } from '../constants';
 import ChefChat from '../components/ChefChat';
 
-// Define AIStudio interface to match the globally expected type 'AIStudio'
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-// Extend window for aistudio types with correct interface
+// Define AIStudio interface for global window access
+// Fixing the "All declarations of 'aistudio' must have identical modifiers" and "Subsequent property declarations must have the same type" errors
+// by moving the interface into the declare global block to ensure correct scoping for type merging.
 declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
   interface Window {
-    aistudio: AIStudio;
+    readonly aistudio: AIStudio;
   }
 }
 
 const Studio: React.FC = () => {
-  const { saveRecipe } = useAuth();
+  const { user, saveRecipe, updatePreferences } = useAuth();
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -30,16 +29,28 @@ const Studio: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<'loading' | 'healthy' | 'unconfigured'>('loading');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(INGREDIENT_CATEGORIES[0].name);
   
+  // Initialize preferences from User Profile for seamless customization
   const [prefs, setPrefs] = useState({
-    diet: 'None',
-    cuisine: 'North Indian',
+    diet: user?.preferences.diet || 'None',
+    cuisine: user?.preferences.favoriteCuisines[0] || 'North Indian',
     mealType: 'Dinner',
-    skill: 'Intermediate'
+    skill: user?.preferences.skillLevel || 'Intermediate'
   });
 
+  // Logic to validate the synthesis engine health and check if an API key has been selected
   const validateEngine = async () => {
     setHealthStatus('loading');
     try {
+      // Check if API key is already selected in the environment as per the guidelines
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          setHealthStatus('unconfigured');
+          setErrorState("API_CONFIGURATION_REQUIRED");
+          return;
+        }
+      }
+
       const status = await checkServerHealth();
       setHealthStatus(status);
       if (status === 'unconfigured') {
@@ -57,10 +68,15 @@ const Studio: React.FC = () => {
     validateEngine();
   }, []);
 
+  // Handle opening the API key selection dialog
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      // Proceed immediately after triggering key selection as per rules.
+      // MUST assume the key selection was successful after triggering openSelectKey() and proceed to the app
+      // to mitigate potential race conditions.
+      setErrorState(null);
+      setHealthStatus('healthy');
+      // Trigger a background health check to verify connectivity
       validateEngine();
     }
   };
@@ -72,13 +88,22 @@ const Studio: React.FC = () => {
     setGeneratedRecipe(null);
     setErrorState(null);
     try {
-      const recipe = await generateRecipe({ ingredients, ...prefs });
+      const recipe = await generateRecipe({ 
+        ingredients, 
+        diet: prefs.diet,
+        cuisine: prefs.cuisine,
+        mealType: prefs.mealType,
+        skill: prefs.skill 
+      });
       const imageUrl = await generateRecipeImage(recipe.imagePrompt);
       setGeneratedRecipe({ ...recipe, imageUrl });
     } catch (err: any) { 
       console.error("Synthesis Error:", err);
-      if (err.message?.includes("API_KEY_MISSING") || err.message?.includes("CALIBRATION") || err.message?.includes("API_KEY_INVALID")) {
+      // If the request fails with an error message containing "Requested entity was not found." or API key issues,
+      // reset the key selection state and prompt the user to select a key again via openSelectKey().
+      if (err.message?.includes("API_KEY") || err.message?.includes("Requested entity was not found") || err.message?.includes("API_KEY_INVALID")) {
         setErrorState("API_CONFIGURATION_REQUIRED");
+        setHealthStatus('unconfigured');
       } else {
         setErrorState("SYNTHESIS_INTERRUPTED");
       }
@@ -114,15 +139,7 @@ const Studio: React.FC = () => {
           </div>
           <div className="space-y-4 text-center">
             <h2 className="text-4xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic leading-tight">Engine Offline</h2>
-            <p className="text-neutral-400 font-medium">The synthesis protocol requires a valid API key from a paid GCP project. Please select a key to initialize the intelligence core.</p>
-          </div>
-          <div className="p-6 bg-neutral-100 dark:bg-neutral-800 rounded-3xl border border-neutral-200 dark:border-neutral-700 text-left">
-            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-3">System Requirements</p>
-            <ul className="space-y-2 text-xs text-neutral-500 font-medium list-disc pl-4">
-              <li>Billing enabled GCP Project</li>
-              <li>Gemini API access configured</li>
-              <li>Paid tier (for high-fidelity synthesis)</li>
-            </ul>
+            <p className="text-neutral-400 font-medium">The synthesis protocol requires a valid API key from a paid GCP project. Please select a key to initialize the intelligence core. See <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-saffron-500 underline hover:text-saffron-600">billing documentation</a> for details.</p>
           </div>
           <button 
             onClick={handleOpenKeySelector}
@@ -130,14 +147,6 @@ const Studio: React.FC = () => {
           >
             Select API Key <Key size={18} />
           </button>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="block text-[10px] font-black text-neutral-400 uppercase tracking-widest hover:text-saffron-500 transition-colors"
-          >
-            Review Billing Documentation
-          </a>
         </div>
       </div>
     );
@@ -145,7 +154,7 @@ const Studio: React.FC = () => {
 
   return (
     <div className="space-y-16 pb-24 text-left">
-      <header className="space-y-6 text-left">
+      <header className="space-y-6">
         <div className="inline-flex items-center gap-3 px-5 py-2 bg-saffron-50 dark:bg-saffron-900/20 text-saffron-600 rounded-full text-[10px] font-black uppercase tracking-[0.3em] border border-saffron-100 dark:border-saffron-900/50">
            <ChefHat size={14} /> Neural Studio
         </div>
@@ -161,7 +170,7 @@ const Studio: React.FC = () => {
               <Sparkles size={14} className="text-saffron-500" /> Input Ingredients
             </h3>
             
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {INGREDIENT_CATEGORIES.map(cat => (
                 <div key={cat.name} className="border border-neutral-200 dark:border-neutral-800 rounded-3xl overflow-hidden bg-white dark:bg-neutral-800/40">
                   <button 
@@ -198,12 +207,12 @@ const Studio: React.FC = () => {
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addCustomIngredient()}
-                placeholder="Add custom item..."
-                className="flex-1 bg-neutral-100 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 px-6 py-4 text-sm font-bold rounded-2xl focus:outline-none focus:border-saffron-500 transition-all placeholder:text-neutral-400 text-neutral-900 dark:text-neutral-50"
+                placeholder="Manual entry..."
+                className="flex-1 bg-neutral-100 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 px-6 py-4 text-sm font-bold rounded-2xl focus:outline-none focus:border-saffron-500 transition-all text-neutral-900 dark:text-neutral-50"
               />
               <button 
                 onClick={addCustomIngredient}
-                className="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-saffron-500 rounded-2xl hover:bg-saffron-50 dark:hover:bg-saffron-900/20 transition-all"
+                className="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-saffron-500 rounded-2xl"
               >
                 <Plus size={20} />
               </button>
@@ -211,10 +220,10 @@ const Studio: React.FC = () => {
           </section>
 
           <section className="space-y-6">
-            <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em]">Synthesis Parameters</h3>
+            <h3 className="text-[11px] font-black text-neutral-400 uppercase tracking-[0.4em]">Customization Protocol</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Cuisine</label>
+                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Cuisine Focus</label>
                 <select 
                   value={prefs.cuisine}
                   onChange={e => setPrefs({...prefs, cuisine: e.target.value})}
@@ -224,7 +233,7 @@ const Studio: React.FC = () => {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Diet</label>
+                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest ml-1">Dietary Logic</label>
                 <select 
                   value={prefs.diet}
                   onChange={e => setPrefs({...prefs, diet: e.target.value})}
@@ -239,7 +248,9 @@ const Studio: React.FC = () => {
           <button 
             disabled={ingredients.length === 0 || isGenerating}
             onClick={handleGenerate}
-            className="w-full py-6 bg-saffron-500 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 rounded-[2rem] hover:bg-saffron-600 disabled:opacity-20 disabled:cursor-not-allowed transition-all shadow-2xl shadow-saffron-500/30"
+            className={`w-full py-6 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 rounded-[2rem] transition-all shadow-2xl ${
+              isGenerating ? 'bg-neutral-900 dark:bg-neutral-700 cursor-not-allowed' : 'bg-saffron-500 hover:bg-saffron-600 shadow-saffron-500/30'
+            } disabled:opacity-20`}
           >
             {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Wand2 size={18} />}
             {isGenerating ? 'Synthesizing...' : 'Run Synthesis'}
@@ -254,8 +265,8 @@ const Studio: React.FC = () => {
                 <ChefHat className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-saffron-500" size={32} />
               </div>
               <div className="text-center space-y-4">
-                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500 animate-pulse">Processing High-Dimensional Data</p>
-                <p className="text-sm text-neutral-400 font-medium italic">Gemini is curating your personalized culinary blueprint...</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-saffron-500 animate-pulse">Mapping Culinary Vectors</p>
+                <p className="text-sm text-neutral-400 font-medium italic">Gemini is parsing your profile preferences and ingredients...</p>
               </div>
             </div>
           ) : generatedRecipe ? (
@@ -267,7 +278,7 @@ const Studio: React.FC = () => {
                    <div className="space-y-4">
                       <div className="flex gap-3">
                         <span className="px-3 py-1 bg-saffron-500 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">{generatedRecipe.cuisine}</span>
-                        <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg">{generatedRecipe.difficulty}</span>
+                        <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg">{generatedRecipe.dietaryNeeds[0] || 'Standard'}</span>
                       </div>
                       <h3 className="text-5xl font-serif font-black text-white italic tracking-tight">{generatedRecipe.title}</h3>
                    </div>
@@ -316,11 +327,11 @@ const Studio: React.FC = () => {
             </div>
           ) : (
             <div className="h-full min-h-[500px] flex flex-col items-center justify-center p-16 text-center space-y-8 bg-neutral-100/30 dark:bg-neutral-800/10 rounded-[3rem] border border-dashed border-neutral-200 dark:border-neutral-800/50">
-              <div className="w-20 h-20 bg-neutral-50 dark:bg-neutral-800 rounded-3xl flex items-center justify-center text-neutral-200 dark:text-neutral-700">
+              <div className="w-20 h-20 bg-neutral-50 dark:bg-neutral-800/40 rounded-3xl flex items-center justify-center text-neutral-200 dark:text-neutral-700">
                 <Utensils size={32} />
               </div>
               <div className="max-w-sm space-y-4">
-                <h3 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic">Awaiting Parameters</h3>
+                <h3 className="text-2xl font-serif font-black text-neutral-900 dark:text-neutral-50 uppercase italic tracking-tight">Awaiting Parameters</h3>
                 <p className="text-sm text-neutral-400 font-medium">Configure your ingredient list and synthesis preferences to generate a precision-engineered culinary protocol.</p>
               </div>
             </div>
