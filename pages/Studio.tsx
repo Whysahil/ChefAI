@@ -7,8 +7,12 @@ import { useAuth } from '../context/AuthContext';
 import { CUISINES, SKILL_LEVELS, INGREDIENT_CATEGORIES, DIETS } from '../constants';
 import ChefChat from '../components/ChefChat';
 
-// Fix: Use the predefined AIStudio type and align with expected global window property modifiers
+// Define the missing AIStudio interface in the global scope to fix the TS2304 error
 declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
   interface Window {
     aistudio?: AIStudio;
   }
