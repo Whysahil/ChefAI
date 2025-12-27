@@ -25,28 +25,29 @@ export interface Recipe {
   ingredients: Ingredient[];
   instructions: string[];
   tips: string[];
-  substitutions: string[];
-  servingSuggestions: string;
   nutrition: Nutrition;
   imagePrompt: string;
   imageUrl?: string;
-  dietaryNeeds: string[];
   createdAt: number;
+  // Added dietaryNeeds to match usage in Studio and geminiService
+  dietaryNeeds: string[];
 }
 
+// Added UserPreferences to resolve AuthContext errors and support settings
 export interface UserPreferences {
   diet: string;
   skillLevel: 'Beginner' | 'Intermediate' | 'Advanced';
-  defaultServings: number;
   favoriteCuisines: string[];
   allergies: string[];
+  defaultServings: number;
 }
 
+// Added User interface to resolve AuthContext errors and unify auth state
 export interface User {
   uid: string;
-  email: string;
   displayName: string;
+  email: string;
   preferences: UserPreferences;
-  savedRecipes: string[];
-  theme: 'light' | 'dark';
 }
+
+export type ViewState = 'studio' | 'cookbook';

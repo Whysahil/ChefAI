@@ -1,8 +1,8 @@
 {
-  "name": "ChefAI",
-  "description": "Your intelligent kitchen companion. Effortless recipe discovery and meal planning for the modern home cook.",
   "requestFramePermissions": [
-    "microphone",
-    "camera"
-  ]
+    "camera",
+    "microphone"
+  ],
+  "name": "",
+  "description": ""
 }

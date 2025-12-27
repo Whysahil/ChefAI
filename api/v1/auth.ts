@@ -1,3 +1,4 @@
+
 export default async function handler(req: any, res: any) {
   const { method } = req;
 
@@ -9,7 +10,8 @@ export default async function handler(req: any, res: any) {
       if (action === 'register') {
         const newUser = { 
           uid: Math.random().toString(36).substring(2, 11), 
-          username: username || safeEmail.split('@')[0], 
+          // Standardize on displayName as used in the UI components
+          displayName: username || safeEmail.split('@')[0], 
           email: safeEmail,
           preferences: {
             diet: 'None',
@@ -30,7 +32,8 @@ export default async function handler(req: any, res: any) {
       if (action === 'login') {
         const user = { 
           uid: "user_" + btoa(safeEmail).substring(0, 8), 
-          username: safeEmail.split('@')[0], 
+          // Standardize on displayName as used in the UI components
+          displayName: safeEmail.split('@')[0], 
           email: safeEmail,
           preferences: {
             diet: 'None',
