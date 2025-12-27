@@ -48,11 +48,20 @@ const nativeRecipeSchema = {
 };
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).json({ status: "error", message: "Method not allowed" });
+  // Ensure we always return JSON
+  const sendError = (status: number, message: string) => {
+    return res.status(status).json({ status: "error", message });
+  };
+
+  if (req.method !== 'POST') return sendError(405, "Method not allowed");
 
   const { ingredients, diet, cuisine, action, prompt } = req.body;
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  if (!process.env.API_KEY) {
+    return sendError(500, "Culinary Engine configuration missing: API_KEY is not defined.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     if (action === 'image') {
@@ -83,7 +92,7 @@ export default async function handler(req: any, res: any) {
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Create a professional recipe using: ${ingredientsList}. Style: ${cuisineStyle}. Diet: ${dietPreference}.`,
+      contents: `Generate a detailed professional recipe. Context: Ingredients: ${ingredientsList}. Style: ${cuisineStyle}. Diet: ${dietPreference}.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: nativeRecipeSchema,
@@ -93,32 +102,28 @@ export default async function handler(req: any, res: any) {
 
     const responseText: string = response.text ?? "";
     if (!responseText) {
-      throw new Error("AI returned empty data stream.");
+      return sendError(500, "The AI model failed to generate a response. Please try again.");
     }
 
-    // LAYER 2: Validation & Normalization
-    let validatedRecipe;
+    // Try to parse and validate
     try {
       const rawRecipe = JSON.parse(responseText);
-      validatedRecipe = validateAndNormalizeRecipe(rawRecipe);
+      const validatedRecipe = validateAndNormalizeRecipe(rawRecipe);
+      return res.status(200).json({
+        status: "success",
+        message: "Recipe synthesized and validated.",
+        recipe: validatedRecipe
+      });
     } catch (validationErr: any) {
-      // Reject invalid AI output with 422
+      console.error("Validation failed for AI output:", responseText);
       return res.status(422).json({
         status: "ai_error",
-        message: validationErr.message || "AI returned incomplete or malformed recipe data."
+        message: validationErr.message || "AI returned malformed data structure."
       });
     }
 
-    return res.status(200).json({
-      status: "success",
-      message: "Recipe synthesized and validated.",
-      recipe: validatedRecipe
-    });
   } catch (error: any) {
-    console.error("Backend API Error:", error);
-    return res.status(500).json({ 
-      status: "error", 
-      message: error.message || "An unexpected error occurred during synthesis." 
-    });
+    console.error("Critical API Error:", error);
+    return sendError(500, error.message || "An unexpected error occurred during synthesis.");
   }
 }

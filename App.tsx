@@ -37,7 +37,13 @@ const App: React.FC = () => {
     setCurrentRecipe(null);
     try {
       const recipe = await AIService.synthesizeRecipe(ingredients, diet, cuisine);
-      const recipeWithMeta = { ...recipe, id: crypto.randomUUID(), createdAt: Date.now() };
+      // Added dietaryNeeds to satisfy the Recipe interface from types.ts
+      const recipeWithMeta: Recipe = { 
+        ...recipe, 
+        id: crypto.randomUUID(), 
+        createdAt: Date.now(),
+        dietaryNeeds: diet !== 'Standard' ? [diet] : []
+      };
       setCurrentRecipe(recipeWithMeta);
       
       const img = await AIService.generateImage(recipe.imagePrompt);
@@ -263,8 +269,8 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex gap-4">
                   <div className="p-6 bg-white dark:bg-neutral-800 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-sm text-center min-w-[120px]">
-                    <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-1">Total Logs</p>
                     <p className="text-3xl font-serif font-black text-saffron-500 leading-none">{savedRecipes.length}</p>
+                    <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mt-1">Total Logs</p>
                   </div>
                 </div>
               </header>

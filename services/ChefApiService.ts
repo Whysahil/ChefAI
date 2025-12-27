@@ -12,11 +12,26 @@ const getHeaders = () => {
 };
 
 async function handleResponse(res: Response) {
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.message || 'Culinary synthesis protocol failure.');
+  const contentType = res.headers.get('content-type');
+  
+  if (contentType && contentType.includes('application/json')) {
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Culinary synthesis protocol failure.');
+    }
+    return data;
+  } else {
+    // If response is not JSON, it's likely a server error page or plain text
+    const text = await res.text();
+    if (!res.ok) {
+      // Extract a cleaner message if it looks like a standard server error
+      if (text.includes('A server error occurred')) {
+        throw new Error("The synthesis engine encountered an internal fault. Please try again in a moment.");
+      }
+      throw new Error(text || `Server responded with status ${res.status}`);
+    }
+    return text;
   }
-  return data;
 }
 
 export const ChefApiService = {
@@ -51,7 +66,6 @@ export const ChefApiService = {
     });
     const data = await handleResponse(res);
     
-    // Ensure the client-side ID and creation time are assigned
     if (data.status === 'success' && data.recipe) {
       return {
         ...data,

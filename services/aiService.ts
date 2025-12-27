@@ -37,7 +37,9 @@ const recipeJsonSchema = {
         fat: { type: Type.STRING }
       }
     },
-    imagePrompt: { type: Type.STRING }
+    imagePrompt: { type: Type.STRING },
+    // Added dietaryNeeds to schema for consistency with Recipe interface
+    dietaryNeeds: { type: Type.ARRAY, items: { type: Type.STRING } }
   },
   required: ["title", "ingredients", "instructions", "imagePrompt"]
 };
@@ -61,7 +63,13 @@ export const AIService = {
     const text = res.text;
     if (!text) throw new Error("AI synthesis returned empty buffer.");
     
-    return parseAIRecipe(JSON.parse(text));
+    const parsed = JSON.parse(text);
+    // Ensure dietaryNeeds is populated for the downstream Recipe interface requirements
+    if (!parsed.dietaryNeeds) {
+      parsed.dietaryNeeds = diet !== 'Standard' ? [diet] : [];
+    }
+    
+    return parseAIRecipe(parsed);
   },
 
   async generateImage(prompt: string) {

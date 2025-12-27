@@ -28,6 +28,8 @@ export const RecipeSchema = z.object({
   tips: z.array(z.string()).default([]),
   nutrition: NutritionSchema.default({ calories: 0, protein: "0g", carbs: "0g", fat: "0g" }),
   imagePrompt: z.string().min(10),
+  // Added dietaryNeeds to match Recipe interface in types.ts
+  dietaryNeeds: z.array(z.string()).default([]),
 });
 
 export function parseAIRecipe(raw: unknown) {

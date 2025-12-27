@@ -35,6 +35,8 @@ export const RecipeSchema = z.object({
     fat: "0g",
   }),
   imagePrompt: z.string().trim().min(10, "A descriptive image prompt is required for visual synthesis"),
+  // Added dietaryNeeds to match Recipe interface in types.ts
+  dietaryNeeds: z.array(z.string()).default([]),
 });
 
 export type ValidatedRecipe = z.infer<typeof RecipeSchema>;
